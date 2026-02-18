@@ -191,6 +191,32 @@
     .settings-grid{grid-template-columns:1fr;}
     .page{padding:14px;}
   }
+
+  /* ── Percentage Popup Modal ── */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:540px;width:100%;max-height:88vh;overflow-y:auto;}
+  .modal-title{font-size:1.1rem;font-weight:800;margin-bottom:6px;}
+  .modal-sub{font-size:.83rem;color:var(--text2);margin-bottom:20px;line-height:1.6;}
+  .modal-actions{display:flex;gap:10px;margin-top:16px;}
+  .modal-actions button{flex:1;padding:11px;border-radius:9px;border:none;font-size:.88rem;font-weight:700;cursor:pointer;transition:opacity .2s;}
+  .modal-actions button:hover{opacity:.85;}
+  .btn-yes{background:var(--accent);color:#fff;}
+  .btn-no{background:var(--surface2);color:var(--text2);border:1px solid var(--border)!important;}
+  .pct-row{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid rgba(46,51,80,.4);}
+  .pct-row:last-child{border-bottom:none;}
+  .pct-label{flex:1;font-size:.84rem;font-weight:600;}
+  .pct-input{width:72px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:7px 10px;font-size:.84rem;text-align:right;outline:none;transition:border-color .2s;}
+  .pct-input:focus{border-color:var(--accent);}
+  .pct-dollar{width:78px;font-size:.84rem;font-weight:700;color:var(--accent2);text-align:right;flex-shrink:0;}
+  .inv1-fixed-box{background:var(--surface2);border:1px solid rgba(79,195,247,.3);border-radius:10px;padding:13px 15px;margin-bottom:14px;}
+  .pct-total-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 2px 0;margin-top:8px;border-top:1px solid var(--border);font-size:.82rem;}
+
+  /* ── History edit ── */
+  .hist-edit-input{background:transparent;border:none;border-bottom:1px dashed var(--border);color:var(--text);font-size:.8rem;font-weight:600;width:80px;text-align:right;outline:none;padding:2px 3px;transition:border-color .2s;}
+  .hist-edit-input:focus{border-color:var(--accent);border-bottom-style:solid;}
+  .hist-del-btn{background:transparent;border:none;cursor:pointer;color:var(--text2);font-size:.85rem;padding:3px 6px;border-radius:5px;transition:color .15s,background .15s;}
+  .hist-del-btn:hover{color:var(--red);background:rgba(255,82,82,.1);}
+  .overflow-badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:.62rem;font-weight:700;background:rgba(0,212,170,.12);color:var(--accent2);margin-left:4px;}
 </style>
 </head>
 <body>
@@ -395,7 +421,7 @@
   <div class="card">
     <div class="card-title">Allocation History</div>
     <table class="hist-table">
-      <thead><tr><th>Pay Date</th><th>Category</th><th>Allocated</th><th>Target</th><th>Status</th></tr></thead>
+      <thead><tr><th>Pay Date</th><th>Category</th><th>Allocated (click to edit)</th><th>Target</th><th>Status</th><th></th></tr></thead>
       <tbody id="histBody"></tbody>
     </table>
   </div>
@@ -459,6 +485,63 @@
   <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
     <button class="save-btn" onclick="saveSettings()">💾 Save Settings</button>
     <span class="saved-toast" id="savedToast">Saved ✓</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     PERCENTAGE POPUP MODAL
+═══════════════════════════════════════════════════ -->
+<div id="pctModal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title">🎉 All Buckets Full!</div>
+    <div class="modal-sub" id="pctModalSub"></div>
+
+    <!-- Step 1: Yes / No -->
+    <div id="pctStep1">
+      <div class="modal-actions">
+        <button class="btn-yes" onclick="showPctAllocator()">Yes, allocate!</button>
+        <button class="btn-no" onclick="closePctModal()">No thanks</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Allocator -->
+    <div id="pctStep2" style="display:none">
+
+      <!-- Investment 1 fixed-priority box -->
+      <div class="inv1-fixed-box">
+        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;color:var(--fixed);margin-bottom:10px;">
+          Investment 1 — Fixed Priority
+        </div>
+        <div class="pct-row" style="border:none;padding:0;">
+          <span class="pct-label" style="color:var(--text2);">Auto-allocate to Investment 1</span>
+          <input class="pct-input" type="number" id="inv1OverflowAmt" min="0" step="0.01"
+            oninput="updatePctRemainder()" style="width:90px;"/>
+          <span class="pct-dollar" id="inv1OverflowLabel" style="color:var(--fixed);">$0.00</span>
+        </div>
+      </div>
+
+      <!-- Remaining label -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2);">
+          Remaining to distribute by %
+        </div>
+        <div style="font-weight:800;font-size:1rem;color:var(--accent2);" id="pctRemLabel">$0.00</div>
+      </div>
+
+      <!-- Per-category percentage rows -->
+      <div id="pctRows"></div>
+
+      <!-- Totals bar -->
+      <div class="pct-total-bar">
+        <span style="color:var(--text2);">Total: <span id="pctTotalPct" style="font-weight:700;">0%</span></span>
+        <span style="color:var(--text2);">Amount: <span id="pctTotalAmt" style="font-weight:700;color:var(--accent);">$0.00</span></span>
+      </div>
+
+      <div class="modal-actions" style="margin-top:14px;">
+        <button class="btn-yes" onclick="applyPctAllocation()">Allocate &amp; Save</button>
+        <button class="btn-no" onclick="closePctModal()">Cancel</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -718,6 +801,136 @@ function runWaterfall() {
       history.unshift({ date: dateStr, category: r.name, allocated: r.allocated, target: r.target });
     }
   });
+
+  // Check if all buckets are full and there is leftover → show percentage popup
+  checkAndShowPctPopup(results, rem, date);
+}
+
+// ══════════════════════════════════════════
+// PERCENTAGE POPUP
+// ══════════════════════════════════════════
+let pctPopupData = { remaining: 0, date: '', results: [] };
+
+function checkAndShowPctPopup(results, remaining, date) {
+  // Only trigger when every category is either fully funded or already paid this month
+  const allFull = results.every(r => r.status === 'full' || r.status === 'skipped');
+  if (!allFull || remaining < 0.01) return;
+
+  pctPopupData = { remaining, date, results };
+
+  document.getElementById('pctModalSub').innerHTML =
+    `You have <strong style="color:var(--green)">$${remaining.toFixed(2)}</strong> left over after ` +
+    `all buckets are fully funded.<br>Ready to allocate by percentage?`;
+
+  document.getElementById('pctStep1').style.display = '';
+  document.getElementById('pctStep2').style.display = 'none';
+  document.getElementById('pctModal').style.display = 'flex';
+}
+
+function closePctModal() {
+  document.getElementById('pctModal').style.display = 'none';
+}
+
+function showPctAllocator() {
+  const { remaining } = pctPopupData;
+
+  // Investment 1 gets a fixed auto-amount: whatever it still needs toward $1000 monthly target,
+  // or $250 as default (1/4 of monthly target), capped at the remaining balance.
+  const inv1Cat = categories.find(c => c.name === 'Investment 1');
+  const inv1Default = inv1Cat ? Math.min(inv1Cat.target ? inv1Cat.target / 4 : 250, remaining) : Math.min(250, remaining);
+
+  document.getElementById('inv1OverflowAmt').value = inv1Default.toFixed(2);
+
+  document.getElementById('pctStep1').style.display = 'none';
+  document.getElementById('pctStep2').style.display = '';
+
+  renderPctRows();
+  updatePctRemainder();
+}
+
+function renderPctRows() {
+  const rows = document.getElementById('pctRows');
+  rows.innerHTML = '';
+  categories.forEach((cat, i) => {
+    const div = document.createElement('div');
+    div.className = 'pct-row';
+    div.innerHTML = `
+      <span class="pct-label">
+        ${cat.name}
+        <span class="type-badge type-${cat.type}" style="font-size:.55rem;">${cat.type === 'F' ? 'Fixed' : 'Var'}</span>
+      </span>
+      <input class="pct-input" type="number" min="0" max="100" step="1" value="0"
+        id="pctIn-${i}" oninput="updatePctRemainder()" placeholder="0%"/>
+      <span class="pct-dollar" id="pctAmt-${i}">$0.00</span>`;
+    rows.appendChild(div);
+  });
+}
+
+function updatePctRemainder() {
+  const { remaining } = pctPopupData;
+  const inv1 = Math.max(0, parseFloat(document.getElementById('inv1OverflowAmt').value) || 0);
+  const afterInv1 = Math.max(0, remaining - inv1);
+
+  document.getElementById('inv1OverflowLabel').textContent = '$' + inv1.toFixed(2);
+  document.getElementById('pctRemLabel').textContent = '$' + afterInv1.toFixed(2);
+
+  let totalPct = 0;
+  categories.forEach((cat, i) => {
+    const pct = Math.max(0, parseFloat(document.getElementById('pctIn-' + i)?.value) || 0);
+    totalPct += pct;
+    const amt = afterInv1 * pct / 100;
+    const el = document.getElementById('pctAmt-' + i);
+    if (el) el.textContent = '$' + amt.toFixed(2);
+  });
+
+  const pctEl = document.getElementById('pctTotalPct');
+  pctEl.textContent = totalPct.toFixed(1) + '%';
+  pctEl.style.color = Math.abs(totalPct - 100) < 0.1 ? 'var(--green)' : totalPct > 100 ? 'var(--red)' : 'var(--text)';
+
+  const totalAmt = afterInv1 * Math.min(totalPct, 100) / 100;
+  document.getElementById('pctTotalAmt').textContent = '$' + totalAmt.toFixed(2);
+}
+
+function applyPctAllocation() {
+  const { remaining, date } = pctPopupData;
+  const inv1 = Math.max(0, parseFloat(document.getElementById('inv1OverflowAmt').value) || 0);
+  const afterInv1 = Math.max(0, remaining - inv1);
+  const dateStr = new Date(date + 'T00:00:00').toLocaleDateString('en-US');
+
+  // Save Investment 1 overflow to history
+  if (inv1 > 0) {
+    history.unshift({
+      date: dateStr,
+      category: 'Investment 1',
+      allocated: parseFloat(inv1.toFixed(2)),
+      target: null,
+      isOverflow: true
+    });
+  }
+
+  // Save per-category percentage allocations to history
+  categories.forEach((cat, i) => {
+    const pct = Math.max(0, parseFloat(document.getElementById('pctIn-' + i)?.value) || 0);
+    if (pct <= 0) return;
+    const amt = parseFloat((afterInv1 * pct / 100).toFixed(2));
+    if (amt > 0) {
+      history.unshift({
+        date: dateStr,
+        category: cat.name,
+        allocated: amt,
+        target: null,
+        isOverflow: true
+      });
+    }
+  });
+
+  closePctModal();
+  renderHistory();
+
+  // Update remaining display to $0
+  const remEl = document.getElementById('remAmt');
+  remEl.textContent = '$0.00';
+  remEl.className = 'val v-pos';
 }
 
 // ══════════════════════════════════════════
@@ -833,21 +1046,43 @@ const METHOD_ICONS = {
 function renderHistory() {
   const tbody = document.getElementById('histBody');
   if (!history.length) {
-    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text2)">No history yet.</td></tr>';
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text2)">No history yet.</td></tr>';
     return;
   }
-  tbody.innerHTML = history.map(r=>{
-    const pct = r.target ? r.allocated/r.target*100 : 100;
-    const status = !r.target?'full':pct>=100?'full':pct>0?'partial':'empty';
-    const label = status==='full'?'Funded':status==='partial'?'Partial':'Unfunded';
-    return`<tr>
+  tbody.innerHTML = history.map((r, i) => {
+    const pct = r.target ? r.allocated / r.target * 100 : 100;
+    const status = !r.target ? 'full' : pct >= 100 ? 'full' : pct > 0 ? 'partial' : 'empty';
+    const label = status === 'full' ? 'Funded' : status === 'partial' ? 'Partial' : 'Unfunded';
+    const overflowBadge = r.isOverflow ? '<span class="overflow-badge">overflow %</span>' : '';
+    return `<tr>
       <td>${r.date}</td>
-      <td>${r.category}</td>
-      <td style="font-weight:600">$${r.allocated.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-      <td style="color:var(--text2)">${r.target?'$'+r.target.toLocaleString():'—'}</td>
+      <td>${r.category}${overflowBadge}</td>
+      <td>
+        <input class="hist-edit-input" type="number" value="${r.allocated.toFixed(2)}" min="0" step="0.01"
+          title="Click to edit"
+          onchange="updateHistoryAllocated(${i}, this.value)"
+          onfocus="this.select()"/>
+      </td>
+      <td style="color:var(--text2)">${r.target ? '$' + r.target.toLocaleString() : '—'}</td>
       <td><span class="pill pill-${status}">${label}</span></td>
+      <td><button class="hist-del-btn" title="Delete row" onclick="deleteHistoryRow(${i})">✕</button></td>
     </tr>`;
   }).join('');
+}
+
+function updateHistoryAllocated(index, value) {
+  const v = parseFloat(value);
+  if (!isNaN(v) && v >= 0) {
+    history[index].allocated = v;
+    // Re-render to update the status pill
+    renderHistory();
+  }
+}
+
+function deleteHistoryRow(index) {
+  if (!confirm(`Delete this entry for "${history[index].category}" ($${history[index].allocated.toFixed(2)})?`)) return;
+  history.splice(index, 1);
+  renderHistory();
 }
 
 // ══════════════════════════════════════════
