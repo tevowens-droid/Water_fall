@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waterfall Budget</title>
+<style>
+  :root {
+    --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --surface3:#2a2f45;
+    --border:#2e3350; --accent:#6c63ff; --accent2:#00d4aa;
+    --text:#e8eaf6; --text2:#8b90b8;
+    --fixed:#4fc3f7; --variable:#ffd54f;
+    --green:#69f0ae; --yellow:#ffd54f; --red:#ff5252; --orange:#ffab40;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+  /* ── Nav ── */
+  nav{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;height:52px;gap:4px;}
+  .nav-brand{font-size:1.1rem;font-weight:800;margin-right:20px;}
+  .nav-brand span{color:var(--accent);}
+  .nav-btn{padding:7px 16px;border-radius:7px;font-size:.82rem;font-weight:600;cursor:pointer;color:var(--text2);border:none;background:transparent;transition:all .15s;}
+  .nav-btn:hover{background:var(--surface2);color:var(--text);}
+  .nav-btn.active{background:var(--accent);color:#fff;}
+
+  /* ── Pages ── */
+  .page{display:none;padding:20px 28px;max-width:1300px;margin:0 auto;}
+  .page.active{display:block;}
+
+  /* ── Cards ── */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;}
+  .card-title{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--text2);margin-bottom:14px;}
+
+  /* ── Budget page layout ── */
+  .budget-grid{display:grid;grid-template-columns:340px 1fr;gap:18px;}
+
+  /* ── Inputs ── */
+  .input-group{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;}
+  .input-group label{font-size:.72rem;color:var(--text2);font-weight:600;}
+  .input-group input,.input-group select{
+    background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);padding:9px 13px;font-size:.93rem;width:100%;outline:none;transition:border-color .2s;
+  }
+  .input-group input:focus,.input-group select:focus{border-color:var(--accent);}
+
+  .amount-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;}
+  .amount-col label{font-size:.72rem;font-weight:700;display:block;margin-bottom:5px;}
+  .amount-col.est label{color:var(--yellow);}
+  .amount-col.act label{color:var(--green);}
+  .amount-col input{
+    background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);padding:9px 12px;font-size:.93rem;width:100%;outline:none;transition:border-color .2s;
+  }
+  .amount-col.est input:focus{border-color:var(--yellow);}
+  .amount-col.act input{border-color:rgba(105,240,174,.25);}
+  .amount-col.act input:focus{border-color:var(--green);}
+  .field-hint{font-size:.63rem;color:var(--text2);margin-top:3px;display:flex;align-items:center;gap:4px;}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--text2);flex-shrink:0;}
+  .dot.on{background:var(--green);}
+
+  .diff-bar{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-radius:8px;padding:9px 13px;margin-bottom:11px;font-size:.81rem;}
+  .diff-bar .lbl{color:var(--text2);}
+  .diff-pos{color:var(--green);font-weight:700;}
+  .diff-neg{color:var(--red);font-weight:700;}
+  .diff-zero{color:var(--text2);font-weight:700;}
+
+  .mode-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;}
+  .mode-btn{padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:.79rem;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;}
+  .mode-btn.m-est{border-color:var(--yellow);background:rgba(255,213,79,.1);color:var(--yellow);}
+  .mode-btn.m-act{border-color:var(--green);background:rgba(105,240,174,.1);color:var(--green);}
+
+  .run-btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px;font-size:.91rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:10px;transition:opacity .2s,transform .1s;}
+  .run-btn:hover{opacity:.85;}
+  .run-btn:active{transform:scale(.98);}
+
+  .remaining-row{display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-radius:8px;padding:9px 13px;font-size:.82rem;}
+  .remaining-row .lbl{color:var(--text2);}
+  .remaining-row .val{font-weight:700;font-size:.98rem;}
+  .v-pos{color:var(--green);}
+  .v-neg{color:var(--red);}
+
+  /* ── Summary grid ── */
+  .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+  .stat{background:var(--surface2);border-radius:10px;padding:12px;text-align:center;}
+  .stat .v{font-size:1.2rem;font-weight:800;margin-bottom:3px;}
+  .stat .l{font-size:.66rem;color:var(--text2);text-transform:uppercase;letter-spacing:.7px;}
+
+  /* ── Tabs ── */
+  .tab-bar{display:flex;gap:4px;margin-bottom:14px;}
+  .tab{padding:6px 15px;border-radius:7px;font-size:.79rem;font-weight:600;cursor:pointer;color:var(--text2);transition:all .15s;}
+  .tab.active{background:var(--accent);color:#fff;}
+  .tab:hover:not(.active){background:var(--surface2);color:var(--text);}
+
+  /* ── Waterfall rows ── */
+  .wf-list{display:flex;flex-direction:column;gap:6px;}
+  .wf-row{background:var(--surface2);border-radius:10px;padding:12px 15px;position:relative;overflow:hidden;border:1px solid transparent;transition:border-color .2s;cursor:pointer;}
+  .wf-row:hover{border-color:var(--border);}
+  .wf-fill{position:absolute;top:0;left:0;bottom:0;border-radius:10px;transition:width 1s cubic-bezier(.4,0,.2,1);width:0%;}
+  .wf-fill.full{background:rgba(105,240,174,.11);}
+  .wf-fill.partial{background:rgba(108,99,255,.12);}
+  .wf-content{position:relative;z-index:1;display:flex;align-items:center;gap:9px;}
+  .wf-num{width:21px;height:21px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.67rem;font-weight:700;flex-shrink:0;}
+  .wf-num.full{background:var(--green);color:#000;}
+  .wf-num.partial{background:var(--accent);color:#fff;}
+  .wf-num.empty{background:var(--border);color:var(--text2);}
+  .wf-info{flex:1;}
+  .wf-name-row{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
+  .wf-name{font-size:.85rem;font-weight:600;}
+  .wf-flow{font-size:.7rem;color:var(--text2);}
+  .wf-right{text-align:right;}
+  .wf-amt{font-size:.9rem;font-weight:700;}
+  .wf-amt.full{color:var(--green);}
+  .wf-amt.partial{color:var(--accent);}
+  .wf-amt.empty{color:var(--text2);}
+  .wf-sub{font-size:.66rem;color:var(--text2);margin-top:1px;}
+
+  .type-badge{font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;}
+  .type-F{background:rgba(79,195,247,.15);color:var(--fixed);}
+  .type-V{background:rgba(255,213,79,.15);color:var(--variable);}
+
+  /* flow pill */
+  .flow-pill{display:inline-flex;align-items:center;gap:4px;font-size:.67rem;color:var(--text2);}
+  .flow-arrow{color:var(--border);}
+  .flow-step{background:var(--surface3);border-radius:4px;padding:1px 6px;color:var(--text2);}
+  .flow-step.method{color:var(--accent2);}
+
+  /* ── Flow detail panel ── */
+  .flow-detail{background:var(--surface3);border-radius:8px;padding:11px 14px;margin-top:8px;display:none;border:1px solid var(--border);}
+  .flow-detail.open{display:block;}
+  .flow-step-list{display:flex;flex-direction:column;gap:6px;}
+  .flow-step-item{display:flex;align-items:center;gap:8px;font-size:.8rem;}
+  .step-circle{width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;flex-shrink:0;}
+  .step-text{flex:1;}
+  .step-method{font-weight:700;color:var(--accent2);}
+  .step-account{color:var(--text);}
+  .step-connector{width:1px;height:10px;background:var(--border);margin-left:9px;}
+
+  /* ── History ── */
+  .hist-table{width:100%;border-collapse:collapse;font-size:.8rem;}
+  .hist-table th{text-align:left;padding:6px 10px;color:var(--text2);font-size:.67rem;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);}
+  .hist-table td{padding:7px 10px;border-bottom:1px solid rgba(46,51,80,.4);}
+  .hist-table tr:last-child td{border-bottom:none;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.66rem;font-weight:700;}
+  .pill-full{background:rgba(105,240,174,.15);color:var(--green);}
+  .pill-partial{background:rgba(108,99,255,.15);color:var(--accent);}
+  .pill-empty{background:rgba(139,144,184,.1);color:var(--text2);}
+
+  /* ── Empty state ── */
+  .empty{text-align:center;padding:45px 20px;color:var(--text2);}
+  .empty .icon{font-size:2.2rem;margin-bottom:8px;}
+  .empty p{font-size:.85rem;line-height:1.6;}
+
+  /* ── Banner ── */
+  .banner{background:rgba(255,171,64,.08);border:1px solid rgba(255,171,64,.25);border-radius:10px;padding:11px 15px;font-size:.81rem;display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .banner .msg{flex:1;color:var(--orange);}
+  .banner button{background:var(--orange);color:#000;border:none;border-radius:6px;padding:5px 11px;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+
+  /* ══════════════════════════════════
+     SETTINGS PAGE
+  ══════════════════════════════════ */
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .settings-table{width:100%;border-collapse:collapse;}
+  .settings-table th{text-align:left;padding:7px 10px;font-size:.67rem;text-transform:uppercase;letter-spacing:.8px;color:var(--text2);border-bottom:1px solid var(--border);}
+  .settings-table td{padding:6px 8px;border-bottom:1px solid rgba(46,51,80,.35);vertical-align:middle;}
+  .settings-table tr:last-child td{border-bottom:none;}
+  .settings-table input,.settings-table select{
+    background:var(--surface3);border:1px solid var(--border);border-radius:6px;
+    color:var(--text);padding:6px 9px;font-size:.81rem;width:100%;outline:none;transition:border-color .2s;
+  }
+  .settings-table input:focus,.settings-table select:focus{border-color:var(--accent);}
+  .settings-table input[type=number]{width:90px;}
+  .icon-btn{background:transparent;border:none;cursor:pointer;color:var(--text2);font-size:.95rem;padding:3px 6px;border-radius:5px;transition:background .15s,color .15s;}
+  .icon-btn:hover{background:var(--surface3);color:var(--text);}
+  .icon-btn.del:hover{color:var(--red);}
+  .add-btn{background:var(--surface2);border:1px dashed var(--border);border-radius:8px;padding:9px;color:var(--text2);font-size:.8rem;font-weight:600;cursor:pointer;width:100%;text-align:center;margin-top:10px;transition:border-color .15s,color .15s;}
+  .add-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .save-btn{background:var(--accent);color:#fff;border:none;border-radius:9px;padding:10px 22px;font-size:.88rem;font-weight:700;cursor:pointer;transition:opacity .2s;}
+  .save-btn:hover{opacity:.85;}
+  .saved-toast{display:inline-block;color:var(--green);font-size:.8rem;margin-left:10px;opacity:0;transition:opacity .3s;}
+  .saved-toast.show{opacity:1;}
+
+  /* flow steps editor */
+  .flow-editor{display:flex;flex-direction:column;gap:6px;}
+  .flow-step-row{display:flex;gap:6px;align-items:center;}
+  .flow-step-row input{flex:1;}
+  .flow-step-row select{width:130px;}
+
+  @media(max-width:900px){
+    .budget-grid{grid-template-columns:1fr;}
+    .summary-grid{grid-template-columns:1fr 1fr;}
+    .settings-grid{grid-template-columns:1fr;}
+    .page{padding:14px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">💧 <span>Waterfall</span></div>
+  <button class="nav-btn active" onclick="goPage('budget',this)">This Week</button>
+  <button class="nav-btn" onclick="goPage('next',this)">Next Week</button>
+  <button class="nav-btn" onclick="goPage('history',this)">History</button>
+  <button class="nav-btn" onclick="goPage('settings',this)">⚙️ Settings</button>
+</nav>
+
+<!-- ══════════════════════════════════════════════════
+     PAGE: BUDGET
+═══════════════════════════════════════════════════ -->
+<div class="page active" id="page-budget">
+  <div class="budget-grid">
+
+    <!-- LEFT -->
+    <div>
+      <div class="card">
+        <div class="card-title">Paycheck</div>
+        <button onclick="syncFromSheets('thisWeek', this)" style="background:var(--accent2);color:#000;border:none;border-radius:6px;padding:5px 11px;font-size:.75rem;font-weight:700;cursor:pointer;margin-bottom:10px;width:100%;">
+          📊 Sync from Google Sheets
+        </button>
+        <div class="input-group">
+          <label>Pay Date</label>
+          <input type="date" id="payDate" oninput="onAmtChange();renderDefaultCatList()"/>
+        </div>
+        <div class="amount-cols">
+          <div class="amount-col est">
+            <label>📊 Estimate</label>
+            <input type="number" id="estAmt" placeholder="e.g. 2870" step="0.01" oninput="onAmtChange()"/>
+            <div class="field-hint"><span class="dot"></span>From Google Sheet</div>
+          </div>
+          <div class="amount-col act">
+            <label>✉️ Actual</label>
+            <input type="number" id="actAmt" placeholder="From email" step="0.01" oninput="onAmtChange()"/>
+            <div class="field-hint"><span class="dot" id="actDot"></span><span id="actHint">Pending email</span></div>
+          </div>
+        </div>
+        <div class="diff-bar" id="diffBar" style="display:none">
+          <span class="lbl">Estimate vs Actual</span>
+          <span id="diffVal"></span>
+        </div>
+        <div class="card-title" style="margin-top:2px">Run with</div>
+        <div class="mode-row">
+          <div class="mode-btn m-est" id="modeEst" onclick="setMode('est')">📊 Estimate</div>
+          <div class="mode-btn" id="modeAct" onclick="setMode('act')">✉️ Actual</div>
+        </div>
+        <button class="run-btn" onclick="runWaterfall()">▶ Run Waterfall</button>
+        <div class="remaining-row" id="remRow" style="display:none">
+          <span class="lbl">Remaining after allocation</span>
+          <span class="val" id="remAmt"></span>
+        </div>
+      </div>
+
+      <!-- Category list always visible on left -->
+      <div class="card">
+        <div class="card-title">Categories</div>
+        <div id="leftCatList"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+      <div class="banner" id="diffBanner" style="display:none">
+        <span>⚠️</span>
+        <span class="msg" id="diffBannerMsg"></span>
+        <button onclick="setMode('act');runWaterfall()">Re-run with Actual</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Summary</div>
+        <div class="summary-grid" id="summaryGrid">
+          <div class="stat"><div class="v" style="color:var(--green)">—</div><div class="l">Fully Funded</div></div>
+          <div class="stat"><div class="v" style="color:var(--accent)">—</div><div class="l">Partial</div></div>
+          <div class="stat"><div class="v" style="color:var(--text2)">—</div><div class="l">Unfunded</div></div>
+          <div class="stat"><div class="v" style="color:var(--yellow)">—</div><div class="l">Allocated</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="tab-bar">
+          <div class="tab active" onclick="showTab('wf',this)">Waterfall</div>
+          <div class="tab" onclick="showTab('flow',this)">💸 Money Flow</div>
+        </div>
+        <div id="tabWf">
+          <div class="wf-list" id="wfList">
+            <div class="empty"><div class="icon">💧</div><p>Hit <strong>Run Waterfall</strong> to see<br>this week's funded categories.</p></div>
+          </div>
+        </div>
+        <div id="tabFlow" style="display:none">
+          <div class="wf-list" id="flowList">
+            <div class="empty"><div class="icon">💸</div><p>Hit <strong>Run Waterfall</strong> to see<br>your transfer instructions.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     PAGE: NEXT WEEK
+═══════════════════════════════════════════════════ -->
+<div class="page" id="page-next">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <div style="background:rgba(108,99,255,.15);border:1px solid rgba(108,99,255,.3);border-radius:8px;padding:7px 14px;font-size:.78rem;color:var(--accent);">
+      📅 Planning ahead — this week's confirmed allocations will be factored in automatically
+    </div>
+  </div>
+  <div class="budget-grid">
+
+    <!-- LEFT -->
+    <div>
+      <div class="card">
+        <div class="card-title">Paycheck</div>
+        <button onclick="syncFromSheets('nextWeek', this)" style="background:var(--accent2);color:#000;border:none;border-radius:6px;padding:5px 11px;font-size:.75rem;font-weight:700;cursor:pointer;margin-bottom:10px;width:100%;">
+          📊 Sync from Google Sheets
+        </button>
+        <div class="input-group">
+          <label>Pay Date</label>
+          <input type="date" id="n-payDate" oninput="onAmtChangeN();renderDefaultCatListN()"/>
+        </div>
+        <div class="amount-cols">
+          <div class="amount-col est">
+            <label>📊 Estimate</label>
+            <input type="number" id="n-estAmt" placeholder="e.g. 2870" step="0.01" oninput="onAmtChangeN()"/>
+            <div class="field-hint"><span class="dot"></span>From Google Sheet</div>
+          </div>
+          <div class="amount-col act">
+            <label>✉️ Actual</label>
+            <input type="number" id="n-actAmt" placeholder="From email" step="0.01" oninput="onAmtChangeN()"/>
+            <div class="field-hint"><span class="dot" id="n-actDot"></span><span id="n-actHint">Pending email</span></div>
+          </div>
+        </div>
+        <div class="diff-bar" id="n-diffBar" style="display:none">
+          <span class="lbl">Estimate vs Actual</span>
+          <span id="n-diffVal"></span>
+        </div>
+        <div class="card-title" style="margin-top:2px">Run with</div>
+        <div class="mode-row">
+          <div class="mode-btn m-est" id="n-modeEst" onclick="setModeN('est')">📊 Estimate</div>
+          <div class="mode-btn" id="n-modeAct" onclick="setModeN('act')">✉️ Actual</div>
+        </div>
+        <button class="run-btn" onclick="runWaterfallN()">▶ Run Waterfall</button>
+        <div class="remaining-row" id="n-remRow" style="display:none">
+          <span class="lbl">Remaining after allocation</span>
+          <span class="val" id="n-remAmt"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Categories <span style="font-size:.65rem;color:var(--accent);font-weight:600;margin-left:4px;">incl. this week's MTD</span></div>
+        <div id="n-leftCatList"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+      <div class="banner" id="n-diffBanner" style="display:none">
+        <span>⚠️</span>
+        <span class="msg" id="n-diffBannerMsg"></span>
+        <button onclick="setModeN('act');runWaterfallN()">Re-run with Actual</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Summary</div>
+        <div class="summary-grid" id="n-summaryGrid">
+          <div class="stat"><div class="v" style="color:var(--green)">—</div><div class="l">Funded</div></div>
+          <div class="stat"><div class="v" style="color:var(--accent)">—</div><div class="l">Partial</div></div>
+          <div class="stat"><div class="v" style="color:var(--accent2)">—</div><div class="l">Already Paid</div></div>
+          <div class="stat"><div class="v" style="color:var(--yellow)">—</div><div class="l">This Week</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="tab-bar">
+          <div class="tab active" onclick="showTabN('wf',this)">Waterfall</div>
+          <div class="tab" onclick="showTabN('flow',this)">💸 Money Flow</div>
+        </div>
+        <div id="n-tabWf">
+          <div class="wf-list" id="n-wfList">
+            <div class="empty"><div class="icon">💧</div><p>Hit <strong>Run Waterfall</strong> to see<br>next week's projected allocations.</p></div>
+          </div>
+        </div>
+        <div id="n-tabFlow" style="display:none">
+          <div class="wf-list" id="n-flowList">
+            <div class="empty"><div class="icon">💸</div><p>Hit <strong>Run Waterfall</strong> to see<br>your transfer instructions.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     PAGE: HISTORY
+═══════════════════════════════════════════════════ -->
+<div class="page" id="page-history">
+  <div class="card">
+    <div class="card-title">Allocation History</div>
+    <table class="hist-table">
+      <thead><tr><th>Pay Date</th><th>Category</th><th>Allocated</th><th>Target</th><th>Status</th></tr></thead>
+      <tbody id="histBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     PAGE: SETTINGS
+═══════════════════════════════════════════════════ -->
+<div class="page" id="page-settings">
+  <div class="settings-grid">
+
+    <!-- Categories table -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-title">Categories & Targets</div>
+      <table class="settings-table" id="catTable">
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Category Name</th>
+            <th>Type</th>
+            <th>Monthly Target ($)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="catTableBody"></tbody>
+      </table>
+      <button class="add-btn" onclick="addCatRow()">+ Add Category</button>
+    </div>
+
+    <!-- Flow instructions -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-title">Money Flow Instructions</div>
+      <p style="font-size:.8rem;color:var(--text2);margin-bottom:14px;">For each category, define where the money goes and how it gets there. Each step is one transfer action.</p>
+      <div id="flowEditorWrap"></div>
+    </div>
+
+    <!-- Google Sheets Integration -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-title">📊 Google Sheets Integration</div>
+      <p style="font-size:.8rem;color:var(--text2);margin-bottom:14px;">
+        Auto-sync paycheck dates and estimates from your Google Sheet. 
+        <a href="#" onclick="showSheetsHelp();return false;" style="color:var(--accent);text-decoration:underline;">Setup instructions</a>
+      </p>
+      
+      <div class="input-group">
+        <label>Google Apps Script Web App URL</label>
+        <input type="text" id="sheetsUrl" placeholder="https://script.google.com/macros/s/AKfycby.../exec" style="font-family:monospace;font-size:.8rem;"/>
+        <div style="font-size:.7rem;color:var(--text2);margin-top:4px;">
+          Paste the URL from your deployed Google Apps Script here. 
+          <span id="sheetsStatus" style="font-weight:700;"></span>
+        </div>
+      </div>
+
+      <button class="save-btn" onclick="testSheetsConnection()" style="background:var(--accent2);margin-top:8px;">
+        🔗 Test Connection
+      </button>
+    </div>
+
+  </div>
+
+  <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
+    <button class="save-btn" onclick="saveSettings()">💾 Save Settings</button>
+    <span class="saved-toast" id="savedToast">Saved ✓</span>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let categories = [
+  { name:'Bills',        type:'F', target:871.39,  flow:[] },
+  { name:'Saving 1',     type:'F', target:1147.5,  flow:[] },
+  { name:'Investment 1', type:'F', target:1000,    flow:[] },
+  { name:'Chase cc',     type:'V', target:1952,    flow:[] },
+  { name:'Saving 2',     type:'F', target:833.3,   flow:[] },
+  { name:'Investment 2', type:'F', target:500,     flow:[] },
+  { name:'Discover',     type:'F', target:185.66,  flow:[] },
+  { name:'Wedding',      type:'F', target:277.5,   flow:[] },
+  { name:'Chase 2',      type:'F', target:520,     flow:[] },
+  { name:'Amex',         type:'V', target:null,    flow:[] },
+];
+
+let history = [
+  {date:'2/13/2026',category:'Amex',         allocated:1074,   target:null   },
+  {date:'2/13/2026',category:'Investment 1', allocated:250,    target:1000   },
+  {date:'2/13/2026',category:'Saving 2',     allocated:580,    target:833.3  },
+  {date:'2/13/2026',category:'Investment 2', allocated:500,    target:500    },
+  {date:'2/13/2026',category:'Discover',     allocated:500,    target:185.66 },
+  {date:'2/6/2026', category:'Bills',        allocated:871.39, target:871.39 },
+  {date:'2/6/2026', category:'Saving 1',     allocated:1147.5, target:1147.5 },
+  {date:'2/6/2026', category:'Investment 1', allocated:250,    target:1000   },
+  {date:'2/6/2026', category:'Wedding',      allocated:277.5,  target:277.5  },
+  {date:'2/6/2026', category:'Saving 2',     allocated:253,    target:833.3  },
+];
+
+let mode = 'est';
+let lastResults = null;
+
+// ── Init ──────────────────────────────────
+document.getElementById('payDate').valueAsDate = new Date();
+renderHistory();
+renderSettingsCats();
+renderFlowEditor();
+renderDefaultCatList();
+
+// ══════════════════════════════════════════
+// LEFT CATEGORY LIST (always visible)
+// ══════════════════════════════════════════
+function renderDefaultCatList() {
+  const date = document.getElementById('payDate').value || new Date().toISOString().split('T')[0];
+  const mtd  = getMTDMap(date);
+  const list  = document.getElementById('leftCatList');
+  list.innerHTML = '';
+
+  categories.forEach((cat, i) => {
+    const paid    = mtd[cat.name] || 0;
+    const target  = cat.target || 0;
+    const pct     = target > 0 ? Math.min(100, paid / target * 100) : (paid > 0 ? 100 : 0);
+    const isFull  = target > 0 && paid >= target;
+    const flowHint = cat.flow && cat.flow.length
+      ? cat.flow.map(s => s.account || '—').join(' → ') : '';
+
+    const barColor = isFull ? 'var(--green)' : pct > 0 ? 'var(--accent)' : 'var(--border)';
+    const numBg    = isFull ? 'var(--green)' : 'var(--border)';
+    const numColor = isFull ? '#000' : 'var(--text2)';
+    const numLbl   = isFull ? '✓' : (i + 1);
+
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:8px 4px;border-bottom:1px solid rgba(46,51,80,.4);';
+    if (i === categories.length - 1) div.style.borderBottom = 'none';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:${target?'5px':'0'};">
+        <div style="width:20px;height:20px;border-radius:50%;background:${numBg};color:${numColor};display:flex;align-items:center;justify-content:center;font-size:.63rem;font-weight:700;flex-shrink:0;">${numLbl}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:5px;">
+            <span style="font-size:.82rem;font-weight:600;">${cat.name}</span>
+            <span class="type-badge type-${cat.type}">${cat.type==='F'?'Fixed':'Var'}</span>
+            ${isFull ? '<span style="font-size:.63rem;color:var(--green);font-weight:700;">Already paid</span>' : ''}
+          </div>
+          ${flowHint ? `<div style="font-size:.63rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${flowHint}</div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:.8rem;font-weight:700;color:${isFull?'var(--green)':paid>0?'var(--accent)':'var(--text2)'};">
+            ${paid > 0 ? '$'+paid.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}
+          </div>
+          ${target ? `<div style="font-size:.63rem;color:var(--text2);">of $${target.toLocaleString()}</div>` : ''}
+        </div>
+      </div>
+      ${target ? `
+        <div style="height:3px;background:var(--border);border-radius:2px;margin-left:28px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px;transition:width .6s ease;"></div>
+        </div>` : ''}`;
+    list.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════
+// NAV
+// ══════════════════════════════════════════
+function goPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='settings'){ renderSettingsCats(); renderFlowEditor(); }
+  if(id==='history')  renderHistory();
+  if(id==='next')     initNextWeek();
+}
+
+// ══════════════════════════════════════════
+// MODE
+// ══════════════════════════════════════════
+function setMode(m) {
+  mode = m;
+  document.getElementById('modeEst').className = 'mode-btn' + (m==='est'?' m-est':'');
+  document.getElementById('modeAct').className = 'mode-btn' + (m==='act'?' m-act':'');
+}
+
+// ══════════════════════════════════════════
+// DIFF / AMOUNT CHANGE
+// ══════════════════════════════════════════
+function onAmtChange() {
+  const est = parseFloat(document.getElementById('estAmt').value);
+  const act = parseFloat(document.getElementById('actAmt').value);
+  const hasAct = !isNaN(act) && act > 0;
+  const hasEst = !isNaN(est) && est > 0;
+
+  document.getElementById('actDot').className = hasAct ? 'dot on' : 'dot';
+  document.getElementById('actHint').textContent = hasAct ? 'Confirmed ✓' : 'Pending email';
+  if (hasAct) setMode('act');
+
+  if (hasEst && hasAct) {
+    const diff = act - est;
+    document.getElementById('diffBar').style.display = 'flex';
+    document.getElementById('diffVal').innerHTML =
+      diff > 0 ? `<span class="diff-pos">+$${diff.toFixed(2)} more</span>` :
+      diff < 0 ? `<span class="diff-neg">-$${Math.abs(diff).toFixed(2)} less</span>` :
+                 `<span class="diff-zero">Exact match ✓</span>`;
+    if (diff !== 0) {
+      document.getElementById('diffBanner').style.display = 'flex';
+      document.getElementById('diffBannerMsg').textContent = diff > 0
+        ? `Actual is $${diff.toFixed(2)} more than estimate — re-run to allocate the extra.`
+        : `Actual is $${Math.abs(diff).toFixed(2)} less than estimate — some categories may go unfunded.`;
+    } else {
+      document.getElementById('diffBanner').style.display = 'none';
+    }
+  } else {
+    document.getElementById('diffBar').style.display = 'none';
+    document.getElementById('diffBanner').style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════
+// MTD HELPERS
+// ══════════════════════════════════════════
+
+// Returns total already allocated to a category in the same calendar month as payDate
+function getMTD(categoryName, payDate) {
+  const pd = new Date(payDate + 'T00:00:00');
+  const month = pd.getMonth();
+  const year  = pd.getFullYear();
+  return history
+    .filter(h => {
+      // Parse stored date strings like "2/6/2026"
+      const hd = new Date(h.date);
+      return h.category === categoryName
+          && hd.getMonth() === month
+          && hd.getFullYear() === year;
+    })
+    .reduce((sum, h) => sum + h.allocated, 0);
+}
+
+// Returns a map of { categoryName → mtdTotal } for a given pay date
+function getMTDMap(payDate) {
+  const map = {};
+  categories.forEach(cat => {
+    map[cat.name] = getMTD(cat.name, payDate);
+  });
+  return map;
+}
+
+// ══════════════════════════════════════════
+// WATERFALL CALC (MTD-aware)
+// ══════════════════════════════════════════
+function calcWaterfall(amount, payDate) {
+  const mtd = getMTDMap(payDate);
+  let rem = amount;
+
+  return categories.map(cat => {
+    const fullTarget = cat.target || 0;
+    const alreadyPaid = mtd[cat.name] || 0;
+    const stillNeeded = Math.max(0, fullTarget - alreadyPaid);
+
+    // Already fully funded this month — skip entirely
+    if (fullTarget > 0 && alreadyPaid >= fullTarget) {
+      return { ...cat, allocated: 0, mtd: alreadyPaid, stillNeeded: 0, status: 'skipped' };
+    }
+
+    // Variable with no target — fund whatever is left after fixed cats
+    if (!fullTarget) {
+      if (rem <= 0) return { ...cat, allocated: 0, mtd: alreadyPaid, stillNeeded: 0, status: 'empty' };
+      const a = rem; rem = 0;
+      return { ...cat, allocated: a, mtd: alreadyPaid, stillNeeded: 0, status: 'full' };
+    }
+
+    // Not enough to fill the remaining gap
+    if (rem <= 0) return { ...cat, allocated: 0, mtd: alreadyPaid, stillNeeded, status: 'empty' };
+
+    if (rem >= stillNeeded) {
+      rem -= stillNeeded;
+      return { ...cat, allocated: stillNeeded, mtd: alreadyPaid, stillNeeded, status: 'full' };
+    }
+
+    // Partial fill
+    const a = rem; rem = 0;
+    return { ...cat, allocated: a, mtd: alreadyPaid, stillNeeded, status: 'partial' };
+  });
+}
+
+function runWaterfall() {
+  const est = parseFloat(document.getElementById('estAmt').value);
+  const act = parseFloat(document.getElementById('actAmt').value);
+  const date = document.getElementById('payDate').value;
+  const primary = mode==='act' && !isNaN(act) && act>0 ? act : est;
+  if (!primary || primary<=0) { alert('Please enter a paycheck amount.'); return; }
+  if (!date) { alert('Please select a pay date.'); return; }
+
+  const results = calcWaterfall(primary, date);
+  lastResults = results;
+
+  const totalAlloc = results.reduce((s,r) => s + r.allocated, 0);
+  const rem = primary - totalAlloc;
+  const remRow = document.getElementById('remRow');
+  remRow.style.display = 'flex';
+  const remEl = document.getElementById('remAmt');
+  remEl.textContent = '$' + rem.toFixed(2);
+  remEl.className = 'val ' + (rem >= 0 ? 'v-pos' : 'v-neg');
+
+  // Summary — skipped cats don't count as empty
+  const funded   = results.filter(r => r.status === 'full').length;
+  const partial  = results.filter(r => r.status === 'partial').length;
+  const skipped  = results.filter(r => r.status === 'skipped').length;
+  const unfunded = results.filter(r => r.status === 'empty').length;
+  document.getElementById('summaryGrid').innerHTML = `
+    <div class="stat"><div class="v" style="color:var(--green)">${funded}</div><div class="l">Funded</div></div>
+    <div class="stat"><div class="v" style="color:var(--accent)">${partial}</div><div class="l">Partial</div></div>
+    <div class="stat"><div class="v" style="color:var(--accent2)">${skipped}</div><div class="l">Already Paid</div></div>
+    <div class="stat"><div class="v" style="color:var(--yellow)">$${totalAlloc.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="l">This Week</div></div>
+  `;
+
+  renderWaterfallTab(results);
+  renderFlowTabFor(results, 'flowList');
+  updateLeftCatList(results);
+
+  // Save to history — only newly allocated amounts
+  const dateStr = new Date(date + 'T00:00:00').toLocaleDateString('en-US');
+  results.forEach(r => {
+    if (r.allocated > 0) {
+      history.unshift({ date: dateStr, category: r.name, allocated: r.allocated, target: r.target });
+    }
+  });
+}
+
+// ══════════════════════════════════════════
+// WATERFALL TAB (funded only)
+// ══════════════════════════════════════════
+function renderWaterfallTab(results) {
+  const list = document.getElementById('wfList');
+  list.innerHTML = '';
+
+  // Only show categories that received money this run
+  const funded = results.filter(r => r.allocated > 0);
+  if (!funded.length) {
+    list.innerHTML = '<div class="empty"><div class="icon">💧</div><p>No categories funded.</p></div>';
+    return;
+  }
+
+  funded.forEach((r,i) => {
+    const pct = r.target ? Math.min(100,r.allocated/r.target*100) : (r.allocated>0?100:0);
+    const flowSummary = r.flow && r.flow.length
+      ? r.flow.map((s,si)=>`<span class="flow-step">${s.account||'—'}</span>${si<r.flow.length-1?'<span class="flow-arrow"> → </span>':''}`).join('')
+      : '<span style="font-size:.67rem;color:var(--border)">No flow set</span>';
+
+    const div = document.createElement('div');
+    div.className = 'wf-row';
+    div.innerHTML=`
+      <div class="wf-fill ${r.status}" style="width:0%"></div>
+      <div class="wf-content">
+        <div class="wf-num ${r.status}">${results.indexOf(r)+1}</div>
+        <div class="wf-info">
+          <div class="wf-name-row">
+            <span class="wf-name">${r.name}</span>
+            <span class="type-badge type-${r.type}">${r.type==='F'?'Fixed':'Var'}</span>
+          </div>
+          <div class="flow-pill">${flowSummary}</div>
+        </div>
+        <div class="wf-right">
+          <div class="wf-amt ${r.status}">$${r.allocated.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div class="wf-sub">${r.target?'of $'+r.target.toLocaleString():'no target'} · ${pct.toFixed(0)}%</div>
+        </div>
+      </div>`;
+    list.appendChild(div);
+    setTimeout(()=>div.querySelector('.wf-fill').style.width=pct+'%', 50+i*55);
+  });
+
+  // Update left category list with status indicators
+  updateLeftCatList(results);
+}
+
+// Update left list after waterfall runs — shows MTD + this week's addition
+function updateLeftCatList(results) {
+  const list = document.getElementById('leftCatList');
+  list.innerHTML = '';
+
+  results.forEach((r, i) => {
+    const target    = r.target || 0;
+    const prevMTD   = r.mtd || 0;            // already paid before this run
+    const newTotal  = prevMTD + r.allocated; // after this run
+    const pct       = target > 0 ? Math.min(100, newTotal / target * 100) : (newTotal > 0 ? 100 : 0);
+    const prevPct   = target > 0 ? Math.min(100, prevMTD  / target * 100) : 0;
+    const isFull    = r.status === 'full' || r.status === 'skipped';
+    const isSkipped = r.status === 'skipped';
+    const flowHint  = r.flow && r.flow.length
+      ? r.flow.map(s => s.account || '—').join(' → ') : '';
+
+    const numBg    = isFull ? 'var(--green)' : r.allocated > 0 ? 'var(--accent)' : 'var(--border)';
+    const numColor = isFull ? '#000' : r.allocated > 0 ? '#fff' : 'var(--text2)';
+    const numLbl   = isFull ? '✓' : r.allocated > 0 ? '+' : (i + 1);
+    const amtColor = isFull ? 'var(--green)' : r.allocated > 0 ? 'var(--accent)' : 'var(--text2)';
+
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:8px 4px;border-bottom:1px solid rgba(46,51,80,.4);';
+    if (i === results.length - 1) div.style.borderBottom = 'none';
+
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:${target?'5px':'0'};">
+        <div style="width:20px;height:20px;border-radius:50%;background:${numBg};color:${numColor};display:flex;align-items:center;justify-content:center;font-size:.63rem;font-weight:700;flex-shrink:0;">${numLbl}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+            <span style="font-size:.82rem;font-weight:600;">${r.name}</span>
+            <span class="type-badge type-${r.type}">${r.type==='F'?'Fixed':'Var'}</span>
+            ${isSkipped ? '<span style="font-size:.63rem;color:var(--accent2);font-weight:700;">✓ Already paid</span>' : ''}
+            ${r.allocated > 0 && !isSkipped ? `<span style="font-size:.63rem;color:var(--accent);font-weight:700;">+$${r.allocated.toFixed(2)} this week</span>` : ''}
+          </div>
+          ${flowHint ? `<div style="font-size:.63rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${flowHint}</div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:.8rem;font-weight:700;color:${amtColor};">
+            $${newTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+          </div>
+          ${target ? `<div style="font-size:.63rem;color:var(--text2);">of $${target.toLocaleString()}</div>` : ''}
+        </div>
+      </div>
+      ${target ? `
+        <div style="height:4px;background:var(--border);border-radius:2px;margin-left:28px;overflow:hidden;position:relative;">
+          <div style="height:100%;width:${prevPct}%;background:var(--surface3);border-radius:2px;position:absolute;left:0;"></div>
+          <div style="height:100%;width:${pct}%;background:${isFull?'var(--green)':'var(--accent)'};border-radius:2px;transition:width .7s ease;"></div>
+        </div>` : ''}`;
+    list.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════
+// MONEY FLOW TAB
+// ══════════════════════════════════════════
+const METHOD_ICONS = {
+  'Transfer':'🔄', 'Zelle':'💛', 'Wire':'🏦', 'ACH':'📋',
+  'Cash':'💵', 'Check':'📝', 'Bill Pay':'🧾', 'Other':'📌'
+};
+
+// ══════════════════════════════════════════
+// HISTORY
+// ══════════════════════════════════════════
+function renderHistory() {
+  const tbody = document.getElementById('histBody');
+  if (!history.length) {
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text2)">No history yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = history.map(r=>{
+    const pct = r.target ? r.allocated/r.target*100 : 100;
+    const status = !r.target?'full':pct>=100?'full':pct>0?'partial':'empty';
+    const label = status==='full'?'Funded':status==='partial'?'Partial':'Unfunded';
+    return`<tr>
+      <td>${r.date}</td>
+      <td>${r.category}</td>
+      <td style="font-weight:600">$${r.allocated.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td style="color:var(--text2)">${r.target?'$'+r.target.toLocaleString():'—'}</td>
+      <td><span class="pill pill-${status}">${label}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════
+// SETTINGS — CATEGORIES TABLE
+// ══════════════════════════════════════════
+function renderSettingsCats() {
+  const tbody = document.getElementById('catTableBody');
+  tbody.innerHTML = '';
+  categories.forEach((cat,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML=`
+      <td style="color:var(--text2);font-size:.8rem;text-align:center;">${i+1}</td>
+      <td><input type="text" value="${cat.name}" onchange="categories[${i}].name=this.value;renderFlowEditor()"/></td>
+      <td>
+        <select onchange="categories[${i}].type=this.value">
+          <option value="F" ${cat.type==='F'?'selected':''}>Fixed</option>
+          <option value="V" ${cat.type==='V'?'selected':''}>Variable</option>
+        </select>
+      </td>
+      <td><input type="number" value="${cat.target||''}" placeholder="—" step="0.01" onchange="categories[${i}].target=this.value?parseFloat(this.value):null"/></td>
+      <td>
+        <button class="icon-btn" title="Move up" onclick="moveCat(${i},-1)">↑</button>
+        <button class="icon-btn" title="Move down" onclick="moveCat(${i},1)">↓</button>
+        <button class="icon-btn del" title="Delete" onclick="deleteCat(${i})">✕</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function moveCat(i, dir) {
+  const j = i+dir;
+  if(j<0||j>=categories.length) return;
+  [categories[i],categories[j]]=[categories[j],categories[i]];
+  renderSettingsCats(); renderFlowEditor();
+}
+function deleteCat(i) {
+  if(!confirm(`Remove "${categories[i].name}"?`)) return;
+  categories.splice(i,1);
+  renderSettingsCats(); renderFlowEditor();
+}
+function addCatRow() {
+  categories.push({name:'New Category',type:'F',target:null,flow:[]});
+  renderSettingsCats(); renderFlowEditor();
+  const rows = document.querySelectorAll('#catTableBody tr');
+  rows[rows.length-1].querySelector('input').focus();
+  rows[rows.length-1].querySelector('input').select();
+}
+
+// ══════════════════════════════════════════
+// SETTINGS — FLOW EDITOR
+// ══════════════════════════════════════════
+function renderFlowEditor() {
+  const wrap = document.getElementById('flowEditorWrap');
+  wrap.innerHTML = '';
+  categories.forEach((cat,ci)=>{
+    const section = document.createElement('div');
+    section.style.cssText='margin-bottom:20px;padding-bottom:18px;border-bottom:1px solid var(--border);';
+
+    const flow = cat.flow || [];
+    let stepsHtml = flow.map((s,si)=>`
+      <div class="flow-step-row" id="frow-${ci}-${si}">
+        <select onchange="updateFlowStep(${ci},${si},'method',this.value)">
+          ${['Transfer','Zelle','Wire','ACH','Cash','Check','Bill Pay','Other'].map(m=>`<option ${s.method===m?'selected':''}>${m}</option>`).join('')}
+        </select>
+        <input type="text" placeholder="Landing account name" value="${s.account||''}" onchange="updateFlowStep(${ci},${si},'account',this.value)"/>
+        <button class="icon-btn del" onclick="removeFlowStep(${ci},${si})">✕</button>
+      </div>`).join('<div style="font-size:.7rem;color:var(--text2);padding:2px 0 2px 4px;">then ↓</div>');
+
+    section.innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-weight:700;font-size:.88rem;">${cat.name}</span>
+        <span class="type-badge type-${cat.type}">${cat.type==='F'?'Fixed':'Var'}</span>
+        ${cat.target?`<span style="font-size:.75rem;color:var(--text2)">$${cat.target.toLocaleString()}</span>`:''}
+      </div>
+      <div class="flow-editor" id="flowEditor-${ci}">${stepsHtml || '<div style="font-size:.78rem;color:var(--text2);margin-bottom:6px;">No steps yet.</div>'}</div>
+      <button class="add-btn" style="margin-top:6px;" onclick="addFlowStep(${ci})">+ Add Step</button>`;
+    wrap.appendChild(section);
+  });
+}
+
+function updateFlowStep(ci, si, field, val) {
+  if(!categories[ci].flow) categories[ci].flow=[];
+  categories[ci].flow[si][field]=val;
+}
+function addFlowStep(ci) {
+  if(!categories[ci].flow) categories[ci].flow=[];
+  categories[ci].flow.push({method:'Transfer', account:''});
+  renderFlowEditor();
+}
+function removeFlowStep(ci, si) {
+  categories[ci].flow.splice(si,1);
+  renderFlowEditor();
+}
+
+// ══════════════════════════════════════════
+// SAVE SETTINGS
+// ══════════════════════════════════════════
+function saveSettings() {
+  // Re-read all category name/type/target from inputs in case not yet blurred
+  const rows = document.querySelectorAll('#catTableBody tr');
+  rows.forEach((tr,i)=>{
+    const inputs = tr.querySelectorAll('input,select');
+    categories[i].name   = inputs[0].value;
+    categories[i].type   = inputs[1].value;
+    categories[i].target = inputs[2].value ? parseFloat(inputs[2].value) : null;
+  });
+  // Refresh the left category list
+  renderDefaultCatList();
+  const toast = document.getElementById('savedToast');
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),2000);
+}
+
+// ══════════════════════════════════════════
+// TABS (this week page — scoped)
+// ══════════════════════════════════════════
+function showTab(tab, el) {
+  document.querySelectorAll('#page-budget .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tabWf').style.display   = tab==='wf'  ?'':'none';
+  document.getElementById('tabFlow').style.display = tab==='flow'?'':'none';
+}
+
+// ══════════════════════════════════════════
+// NEXT WEEK STATE & INIT
+// ══════════════════════════════════════════
+let modeN = 'est';
+
+function initNextWeek() {
+  // Auto-set date to +7 days from this week's date
+  const thisDate = document.getElementById('payDate').value;
+  const base = thisDate ? new Date(thisDate + 'T00:00:00') : new Date();
+  base.setDate(base.getDate() + 7);
+  document.getElementById('n-payDate').valueAsDate = base;
+  renderDefaultCatListN();
+}
+
+function setModeN(m) {
+  modeN = m;
+  document.getElementById('n-modeEst').className = 'mode-btn' + (m==='est'?' m-est':'');
+  document.getElementById('n-modeAct').className = 'mode-btn' + (m==='act'?' m-act':'');
+}
+
+function onAmtChangeN() {
+  const est = parseFloat(document.getElementById('n-estAmt').value);
+  const act = parseFloat(document.getElementById('n-actAmt').value);
+  const hasAct = !isNaN(act) && act > 0;
+  const hasEst = !isNaN(est) && est > 0;
+
+  document.getElementById('n-actDot').className = hasAct ? 'dot on' : 'dot';
+  document.getElementById('n-actHint').textContent = hasAct ? 'Confirmed ✓' : 'Pending email';
+  if (hasAct) setModeN('act');
+
+  if (hasEst && hasAct) {
+    const diff = act - est;
+    document.getElementById('n-diffBar').style.display = 'flex';
+    document.getElementById('n-diffVal').innerHTML =
+      diff > 0 ? `<span class="diff-pos">+$${diff.toFixed(2)} more</span>` :
+      diff < 0 ? `<span class="diff-neg">-$${Math.abs(diff).toFixed(2)} less</span>` :
+                 `<span class="diff-zero">Exact match ✓</span>`;
+    if (diff !== 0) {
+      document.getElementById('n-diffBanner').style.display = 'flex';
+      document.getElementById('n-diffBannerMsg').textContent = diff > 0
+        ? `Actual is $${diff.toFixed(2)} more than estimate — re-run to allocate the extra.`
+        : `Actual is $${Math.abs(diff).toFixed(2)} less than estimate — some categories may go unfunded.`;
+    } else {
+      document.getElementById('n-diffBanner').style.display = 'none';
+    }
+  } else {
+    document.getElementById('n-diffBar').style.display = 'none';
+    document.getElementById('n-diffBanner').style.display = 'none';
+  }
+}
+
+// Left cat list for Next Week — uses both this week's history AND any simulated this-week run
+function renderDefaultCatListN() {
+  const date = document.getElementById('n-payDate').value || new Date().toISOString().split('T')[0];
+  // For next week we include history already saved (which includes anything run on This Week tab)
+  const mtd  = getMTDMap(date);
+  const list  = document.getElementById('n-leftCatList');
+  list.innerHTML = '';
+
+  categories.forEach((cat, i) => {
+    const paid   = mtd[cat.name] || 0;
+    const target = cat.target || 0;
+    const pct    = target > 0 ? Math.min(100, paid / target * 100) : (paid > 0 ? 100 : 0);
+    const isFull = target > 0 && paid >= target;
+    const flowHint = cat.flow && cat.flow.length
+      ? cat.flow.map(s => s.account || '—').join(' → ') : '';
+
+    const barColor = isFull ? 'var(--green)' : pct > 0 ? 'var(--accent)' : 'var(--border)';
+    const numBg    = isFull ? 'var(--green)' : 'var(--border)';
+    const numColor = isFull ? '#000' : 'var(--text2)';
+    const numLbl   = isFull ? '✓' : (i + 1);
+
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:8px 4px;border-bottom:1px solid rgba(46,51,80,.4);';
+    if (i === categories.length - 1) div.style.borderBottom = 'none';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:${target?'5px':'0'};">
+        <div style="width:20px;height:20px;border-radius:50%;background:${numBg};color:${numColor};display:flex;align-items:center;justify-content:center;font-size:.63rem;font-weight:700;flex-shrink:0;">${numLbl}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:5px;">
+            <span style="font-size:.82rem;font-weight:600;">${cat.name}</span>
+            <span class="type-badge type-${cat.type}">${cat.type==='F'?'Fixed':'Var'}</span>
+            ${isFull ? '<span style="font-size:.63rem;color:var(--green);font-weight:700;">Already paid</span>' : ''}
+          </div>
+          ${flowHint ? `<div style="font-size:.63rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${flowHint}</div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:.8rem;font-weight:700;color:${isFull?'var(--green)':paid>0?'var(--accent)':'var(--text2)'};">
+            ${paid > 0 ? '$'+paid.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}
+          </div>
+          ${target ? `<div style="font-size:.63rem;color:var(--text2);">of $${target.toLocaleString()}</div>` : ''}
+        </div>
+      </div>
+      ${target ? `
+        <div style="height:3px;background:var(--border);border-radius:2px;margin-left:28px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px;transition:width .6s ease;"></div>
+        </div>` : ''}`;
+    list.appendChild(div);
+  });
+}
+
+function runWaterfallN() {
+  const est = parseFloat(document.getElementById('n-estAmt').value);
+  const act = parseFloat(document.getElementById('n-actAmt').value);
+  const date = document.getElementById('n-payDate').value;
+  const primary = modeN==='act' && !isNaN(act) && act>0 ? act : est;
+  if (!primary || primary<=0) { alert('Please enter a paycheck amount.'); return; }
+  if (!date) { alert('Please select a pay date.'); return; }
+
+  const results = calcWaterfall(primary, date);
+
+  const totalAlloc = results.reduce((s,r) => s + r.allocated, 0);
+  const rem = primary - totalAlloc;
+  const remRow = document.getElementById('n-remRow');
+  remRow.style.display = 'flex';
+  const remEl = document.getElementById('n-remAmt');
+  remEl.textContent = '$' + rem.toFixed(2);
+  remEl.className = 'val ' + (rem >= 0 ? 'v-pos' : 'v-neg');
+
+  const funded   = results.filter(r => r.status === 'full').length;
+  const partial  = results.filter(r => r.status === 'partial').length;
+  const skipped  = results.filter(r => r.status === 'skipped').length;
+  document.getElementById('n-summaryGrid').innerHTML = `
+    <div class="stat"><div class="v" style="color:var(--green)">${funded}</div><div class="l">Funded</div></div>
+    <div class="stat"><div class="v" style="color:var(--accent)">${partial}</div><div class="l">Partial</div></div>
+    <div class="stat"><div class="v" style="color:var(--accent2)">${skipped}</div><div class="l">Already Paid</div></div>
+    <div class="stat"><div class="v" style="color:var(--yellow)">$${totalAlloc.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="l">This Week</div></div>
+  `;
+
+  // Waterfall tab — funded only
+  const wfList = document.getElementById('n-wfList');
+  wfList.innerHTML = '';
+  const funded_rows = results.filter(r => r.allocated > 0);
+  if (!funded_rows.length) {
+    wfList.innerHTML = '<div class="empty"><div class="icon">💧</div><p>No categories to fund next week.</p></div>';
+  } else {
+    funded_rows.forEach((r, i) => {
+      const pct = r.target ? Math.min(100, r.allocated/r.target*100) : (r.allocated>0?100:0);
+      const flowSummary = r.flow && r.flow.length
+        ? r.flow.map((s,si)=>`<span class="flow-step">${s.account||'—'}</span>${si<r.flow.length-1?'<span class="flow-arrow"> → </span>':''}`).join('')
+        : '<span style="font-size:.67rem;color:var(--border)">No flow set</span>';
+      const div = document.createElement('div');
+      div.className = 'wf-row';
+      div.innerHTML = `
+        <div class="wf-fill ${r.status}" style="width:0%"></div>
+        <div class="wf-content">
+          <div class="wf-num ${r.status}">${results.indexOf(r)+1}</div>
+          <div class="wf-info">
+            <div class="wf-name-row">
+              <span class="wf-name">${r.name}</span>
+              <span class="type-badge type-${r.type}">${r.type==='F'?'Fixed':'Var'}</span>
+            </div>
+            <div class="flow-pill">${flowSummary}</div>
+          </div>
+          <div class="wf-right">
+            <div class="wf-amt ${r.status}">$${r.allocated.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+            <div class="wf-sub">${r.target?'of $'+r.target.toLocaleString():'no target'} · ${pct.toFixed(0)}%</div>
+          </div>
+        </div>`;
+      wfList.appendChild(div);
+      setTimeout(()=>div.querySelector('.wf-fill').style.width=pct+'%', 50+i*55);
+    });
+  }
+
+  // Flow tab — reuse renderFlowTab logic with n- flowList
+  renderFlowTabFor(results, 'n-flowList');
+
+  // Update left list with this run's results
+  updateLeftCatListFor(results, 'n-leftCatList');
+
+  // NOTE: Next Week runs are NOT saved to history — they're projections only
+}
+
+// ── Shared flow tab renderer (works for both weeks) ──────────────────
+function renderFlowTabFor(results, listId) {
+  const list = document.getElementById(listId);
+  list.innerHTML = '';
+  const funded = results.filter(r => r.allocated > 0);
+  if (!funded.length) {
+    list.innerHTML = '<div class="empty"><div class="icon">💸</div><p>No allocations to show.</p></div>';
+    return;
+  }
+
+  const accountMap = {};
+  funded.forEach(r => {
+    if (!r.flow || !r.flow.length) return;
+    r.flow.forEach(s => {
+      if (!s.account) return;
+      const key = s.account.trim().toLowerCase();
+      if (!accountMap[key]) accountMap[key] = { account: s.account.trim(), total: 0, categories: [], method: s.method };
+      accountMap[key].total += r.allocated;
+      if (!accountMap[key].categories.includes(r.name)) accountMap[key].categories.push(r.name);
+    });
+  });
+
+  const accts = Object.values(accountMap);
+  if (accts.length > 0) {
+    const summaryDiv = document.createElement('div');
+    summaryDiv.style.cssText = 'margin-bottom:16px;';
+    summaryDiv.innerHTML = `<div style="font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--text2);margin-bottom:8px;">Account Totals</div>`;
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+    accts.forEach(a => {
+      const icon = METHOD_ICONS[a.method] || '📌';
+      grid.innerHTML += `
+        <div style="background:var(--surface3);border-radius:9px;padding:11px 14px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+          <div style="font-size:1.3rem;">${icon}</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.92rem;color:var(--text);">${a.account}</div>
+            <div style="font-size:.7rem;color:var(--text2);margin-top:2px;">${a.categories.join(', ')}</div>
+          </div>
+          <div style="font-weight:800;font-size:1.05rem;color:var(--accent2);">$${a.total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+        </div>`;
+    });
+    summaryDiv.appendChild(grid);
+    list.appendChild(summaryDiv);
+    const divider = document.createElement('div');
+    divider.style.cssText = 'font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--text2);margin-bottom:8px;margin-top:4px;';
+    divider.textContent = 'Per Category Breakdown';
+    list.appendChild(divider);
+  }
+
+  funded.forEach(r => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:var(--surface2);border-radius:10px;padding:12px 15px;margin-bottom:7px;border:1px solid var(--border);';
+    let stepsHtml = '';
+    if (!r.flow || !r.flow.length) {
+      stepsHtml = `<div style="font-size:.78rem;color:var(--text2);font-style:italic;padding:4px 0">No flow set — add steps in ⚙️ Settings.</div>`;
+    } else {
+      stepsHtml = '<div class="flow-step-list">';
+      r.flow.forEach((s, si) => {
+        const icon = METHOD_ICONS[s.method] || '📌';
+        const key = (s.account||'').trim().toLowerCase();
+        const shared = accountMap[key] && accountMap[key].categories.length > 1;
+        const sharedBadge = shared
+          ? `<span style="background:rgba(0,212,170,.12);color:var(--accent2);font-size:.63rem;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:6px;">shared · $${accountMap[key].total.toFixed(2)} total</span>`
+          : '';
+        stepsHtml += `
+          ${si>0?'<div class="step-connector"></div>':''}
+          <div class="flow-step-item">
+            <div class="step-circle">${si+1}</div>
+            <div class="step-text" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+              <span class="step-method">${icon} ${s.method||'Transfer'}</span>
+              <span style="color:var(--text2)">→</span>
+              <span class="step-account">${s.account||'—'}</span>
+              ${sharedBadge}
+            </div>
+          </div>`;
+      });
+      stepsHtml += '</div>';
+    }
+    const amtColor = r.status==='full'?'var(--green)':r.status==='partial'?'var(--accent)':'var(--text2)';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+        <div class="wf-num ${r.status}" style="width:22px;height:22px;font-size:.68rem;">✓</div>
+        <span style="font-weight:700;font-size:.88rem;">${r.name}</span>
+        <span class="type-badge type-${r.type}">${r.type==='F'?'Fixed':'Var'}</span>
+        <span style="margin-left:auto;font-weight:700;font-size:.93rem;color:${amtColor};">$${r.allocated.toFixed(2)}</span>
+      </div>
+      ${stepsHtml}`;
+    list.appendChild(div);
+  });
+}
+
+// ── Shared left-list updater (post-run) ──────────────────────────────
+function updateLeftCatListFor(results, listId) {
+  const list = document.getElementById(listId);
+  list.innerHTML = '';
+  results.forEach((r, i) => {
+    const target    = r.target || 0;
+    const prevMTD   = r.mtd || 0;
+    const newTotal  = prevMTD + r.allocated;
+    const pct       = target > 0 ? Math.min(100, newTotal / target * 100) : (newTotal > 0 ? 100 : 0);
+    const prevPct   = target > 0 ? Math.min(100, prevMTD  / target * 100) : 0;
+    const isFull    = r.status === 'full' || r.status === 'skipped';
+    const isSkipped = r.status === 'skipped';
+    const flowHint  = r.flow && r.flow.length ? r.flow.map(s => s.account||'—').join(' → ') : '';
+    const numBg     = isFull ? 'var(--green)' : r.allocated > 0 ? 'var(--accent)' : 'var(--border)';
+    const numColor  = isFull ? '#000' : r.allocated > 0 ? '#fff' : 'var(--text2)';
+    const numLbl    = isFull ? '✓' : r.allocated > 0 ? '+' : (i + 1);
+    const amtColor  = isFull ? 'var(--green)' : r.allocated > 0 ? 'var(--accent)' : 'var(--text2)';
+
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:8px 4px;border-bottom:1px solid rgba(46,51,80,.4);';
+    if (i === results.length - 1) div.style.borderBottom = 'none';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:${target?'5px':'0'};">
+        <div style="width:20px;height:20px;border-radius:50%;background:${numBg};color:${numColor};display:flex;align-items:center;justify-content:center;font-size:.63rem;font-weight:700;flex-shrink:0;">${numLbl}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+            <span style="font-size:.82rem;font-weight:600;">${r.name}</span>
+            <span class="type-badge type-${r.type}">${r.type==='F'?'Fixed':'Var'}</span>
+            ${isSkipped ? '<span style="font-size:.63rem;color:var(--accent2);font-weight:700;">✓ Already paid</span>' : ''}
+            ${r.allocated > 0 && !isSkipped ? `<span style="font-size:.63rem;color:var(--accent);font-weight:700;">+$${r.allocated.toFixed(2)} projected</span>` : ''}
+          </div>
+          ${flowHint ? `<div style="font-size:.63rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${flowHint}</div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:.8rem;font-weight:700;color:${amtColor};">$${newTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          ${target ? `<div style="font-size:.63rem;color:var(--text2);">of $${target.toLocaleString()}</div>` : ''}
+        </div>
+      </div>
+      ${target ? `
+        <div style="height:4px;background:var(--border);border-radius:2px;margin-left:28px;overflow:hidden;position:relative;">
+          <div style="height:100%;width:${prevPct}%;background:var(--surface3);border-radius:2px;position:absolute;left:0;"></div>
+          <div style="height:100%;width:${pct}%;background:${isFull?'var(--green)':'var(--accent)'};border-radius:2px;transition:width .7s ease;"></div>
+        </div>` : ''}`;
+    list.appendChild(div);
+  });
+}
+
+function showTabN(tab, el) {
+  document.querySelectorAll('#page-next .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('n-tabWf').style.display   = tab==='wf'  ?'':'none';
+  document.getElementById('n-tabFlow').style.display = tab==='flow'?'':'none';
+}
+
+// ══════════════════════════════════════════
+// GOOGLE SHEETS INTEGRATION
+// ══════════════════════════════════════════
+
+// Load saved Sheets URL from localStorage
+let sheetsUrl = localStorage.getItem('sheetsUrl') || '';
+if (sheetsUrl) {
+  document.getElementById('sheetsUrl').value = sheetsUrl;
+}
+
+// Save Sheets URL when settings are saved
+const originalSaveSettings = saveSettings;
+saveSettings = function() {
+  originalSaveSettings();
+  const url = document.getElementById('sheetsUrl').value.trim();
+  if (url) {
+    localStorage.setItem('sheetsUrl', url);
+    sheetsUrl = url;
+  }
+};
+
+// Test connection to Google Sheets
+async function testSheetsConnection() {
+  const url = document.getElementById('sheetsUrl').value.trim();
+  const status = document.getElementById('sheetsStatus');
+  
+  if (!url) {
+    status.textContent = '❌ Please enter a URL first';
+    status.style.color = 'var(--red)';
+    return;
+  }
+  
+  status.textContent = '⏳ Testing...';
+  status.style.color = 'var(--text2)';
+  
+  try {
+    const data = await fetchFromSheets(url);
+    console.log('Received data:', data);
+    
+    if (data.thisWeek && data.nextWeek) {
+      status.textContent = '✓ Connected! Found This Week & Next Week data.';
+      status.style.color = 'var(--green)';
+      localStorage.setItem('sheetsUrl', url);
+      sheetsUrl = url;
+    } else {
+      status.textContent = '⚠️ Connected but unexpected data format. Check console for details.';
+      status.style.color = 'var(--orange)';
+      console.error('Expected thisWeek and nextWeek properties, got:', data);
+    }
+  } catch (err) {
+    console.error('Full error:', err);
+    status.textContent = '❌ Connection failed: ' + err.message;
+    status.style.color = 'var(--red)';
+  }
+}
+
+// Fetch from Google Sheets using JSONP to bypass CORS
+function fetchFromSheets(url) {
+  return new Promise((resolve, reject) => {
+    const callbackName = 'sheetsCallback_' + Date.now();
+    const script = document.createElement('script');
+    
+    window[callbackName] = function(data) {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      resolve(data);
+    };
+    
+    script.onerror = function() {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      reject(new Error('Failed to load script'));
+    };
+    
+    script.src = url + '?callback=' + callbackName;
+    document.body.appendChild(script);
+  });
+}
+
+// Sync from Google Sheets
+async function syncFromSheets(week, buttonElement) {
+  const url = sheetsUrl || document.getElementById('sheetsUrl')?.value.trim();
+  
+  if (!url) {
+    alert('Please configure your Google Sheets URL in ⚙️ Settings first.');
+    return;
+  }
+  
+  try {
+    const data = await fetchFromSheets(url);
+    
+    if (week === 'thisWeek' && data.thisWeek) {
+      if (data.thisWeek.date) {
+        document.getElementById('payDate').value = data.thisWeek.date;
+      }
+      if (data.thisWeek.estimate) {
+        document.getElementById('estAmt').value = data.thisWeek.estimate;
+      }
+      onAmtChange();
+      renderDefaultCatList();
+    } else if (week === 'nextWeek' && data.nextWeek) {
+      if (data.nextWeek.date) {
+        document.getElementById('n-payDate').value = data.nextWeek.date;
+      }
+      if (data.nextWeek.estimate) {
+        document.getElementById('n-estAmt').value = data.nextWeek.estimate;
+      }
+      onAmtChangeN();
+      renderDefaultCatListN();
+    }
+    
+    // Show success feedback
+    if (buttonElement) {
+      const origText = buttonElement.textContent;
+      buttonElement.textContent = '✓ Synced!';
+      buttonElement.style.background = 'var(--green)';
+      setTimeout(() => {
+        buttonElement.textContent = origText;
+        buttonElement.style.background = 'var(--accent2)';
+      }, 2000);
+    }
+    
+  } catch (err) {
+    alert('Failed to sync from Sheets: ' + err.message + '\n\nCheck your URL in Settings.');
+  }
+}
+
+// Show setup help modal
+function showSheetsHelp() {
+  const msg = `
+📊 GOOGLE SHEETS INTEGRATION SETUP
+
+1. Open your Google Sheet
+2. Go to Extensions → Apps Script
+3. Delete any existing code and paste in the script from "google_apps_script.js"
+4. Update the cell references in the script to match your sheet (lines 10-13)
+5. Save the script (Ctrl+S)
+6. Click Deploy → New deployment
+7. Choose "Web app" as the type
+8. Set:
+   - Execute as: Me
+   - Who has access: Anyone
+9. Click Deploy
+10. Copy the Web App URL
+11. Paste it into the field above and click "Test Connection"
+
+The script will pull:
+- This Week: Pay Date & Estimate
+- Next Week: Pay Date & Estimate
+
+Once configured, just click "Sync from Google Sheets" on each week's page!
+  `;
+  alert(msg);
+}
+</script>
+</body>
+</html>
