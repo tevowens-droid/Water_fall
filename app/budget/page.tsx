@@ -88,11 +88,13 @@ export default function BudgetPage() {
     setRemaining(rem);
     fillRefs.current = [];
 
-    // Save to history — dates stored as ISO strings
+    // Save to history — replace any existing entries for this pay date so
+    // re-running (e.g. switching estimate → actual) never creates duplicates
     const newEntries: HistoryEntry[] = res
       .filter(r => r.allocated > 0)
       .map(r => ({ date: payDate, category: r.name, allocated: r.allocated, target: r.target }));
-    setHistory([...newEntries, ...history]);
+    const withoutThisDate = history.filter(h => h.date !== payDate);
+    setHistory([...newEntries, ...withoutThisDate]);
 
     // Show percentage popup if all buckets full and money remains
     const allFull = res.every(r => r.status === 'full' || r.status === 'skipped');
