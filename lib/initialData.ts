@@ -3,7 +3,7 @@ import { Category, HistoryEntry } from './types';
 export const initialCategories: Category[] = [
   { name: 'Bills',        type: 'F', target: 871.39,  flow: [] },
   { name: 'Saving 1',     type: 'F', target: 1147.5,  flow: [] },
-  { name: 'Investment 1', type: 'F', target: 1000,    flow: [] },
+  { name: 'Investment 1', type: 'F', target: 1000,    weeklyTarget: 250, flow: [] },
   { name: 'Chase cc',     type: 'V', target: 1952,    flow: [] },
   { name: 'Saving 2',     type: 'F', target: 833.3,   flow: [] },
   { name: 'Investment 2', type: 'F', target: 500,     flow: [] },

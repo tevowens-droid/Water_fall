@@ -88,6 +88,10 @@ export function calcWaterfall(
     const fullTarget  = cat.target || 0;
     const alreadyPaid = mtd[cat.name] || 0;
     const stillNeeded = Math.max(0, fullTarget - alreadyPaid);
+    // Per-paycheck cap: limits how much this category takes in one run
+    // e.g. weeklyTarget=250 on a $1000/month goal → max $250 per paycheck
+    const cap = (cat.weeklyTarget && cat.weeklyTarget > 0) ? cat.weeklyTarget : stillNeeded;
+    const allowed = Math.min(stillNeeded, cap);
 
     if (fullTarget > 0 && alreadyPaid >= fullTarget) {
       return { ...cat, allocated: 0, mtd: alreadyPaid, stillNeeded: 0, status: 'skipped' as const };
@@ -101,9 +105,10 @@ export function calcWaterfall(
 
     if (rem <= 0) return { ...cat, allocated: 0, mtd: alreadyPaid, stillNeeded, status: 'empty' as const };
 
-    if (rem >= stillNeeded) {
-      rem -= stillNeeded;
-      return { ...cat, allocated: stillNeeded, mtd: alreadyPaid, stillNeeded, status: 'full' as const };
+    if (rem >= allowed) {
+      rem -= allowed;
+      // 'full' here means we hit the per-paycheck cap (or monthly target)
+      return { ...cat, allocated: allowed, mtd: alreadyPaid, stillNeeded, status: 'full' as const };
     }
 
     const a = rem; rem = 0;

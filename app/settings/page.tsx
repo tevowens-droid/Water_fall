@@ -37,7 +37,7 @@ export default function SettingsPage() {
   }
 
   function addCat() {
-    setDraft([...draft, { name: 'New Category', type: 'F', target: null, flow: [] }]);
+    setDraft([...draft, { name: 'New Category', type: 'F', target: null, weeklyTarget: null, flow: [] }]);
     setTimeout(() => {
       const inputs = document.querySelectorAll<HTMLInputElement>('#catTableBody tr:last-child input[type=text]');
       if (inputs[0]) { inputs[0].focus(); inputs[0].select(); }
@@ -118,6 +118,7 @@ export default function SettingsPage() {
                 <th>Category Name</th>
                 <th>Type</th>
                 <th>Monthly Target ($)</th>
+                <th>Weekly Cap ($)</th>
                 <th></th>
               </tr>
             </thead>
@@ -145,6 +146,16 @@ export default function SettingsPage() {
                       placeholder="—"
                       step={0.01}
                       onChange={e => updateCat(i, 'target', e.target.value ? parseFloat(e.target.value) : null)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      value={cat.weeklyTarget ?? ''}
+                      placeholder="—"
+                      step={0.01}
+                      title="Max this category takes per paycheck (leave blank for no cap)"
+                      onChange={e => updateCat(i, 'weeklyTarget', e.target.value ? parseFloat(e.target.value) : null)}
                     />
                   </td>
                   <td>

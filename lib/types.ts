@@ -7,6 +7,8 @@ export interface Category {
   name: string;
   type: 'F' | 'V';
   target: number | null;
+  /** Optional cap per paycheck run (e.g. $250/week toward a $1000/month goal) */
+  weeklyTarget?: number | null;
   flow: FlowStep[];
 }
 
