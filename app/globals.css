@@ -18,6 +18,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html { overflow-x: hidden; }
 body {
   font-family: 'Segoe UI', system-ui, sans-serif;
   background: var(--bg);
@@ -82,8 +83,15 @@ nav {
 .budget-grid {
   display: grid;
   grid-template-columns: 340px 1fr;
+  grid-template-areas:
+    "paycheck results"
+    "cats     results";
   gap: 18px;
+  align-items: start;
 }
+.budget-paycheck { grid-area: paycheck; }
+.budget-results  { grid-area: results; }
+.budget-cats     { grid-area: cats; }
 
 /* ── Inputs ── */
 .input-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 11px; }
@@ -454,9 +462,18 @@ nav {
 }
 
 @media (max-width: 900px) {
-  .budget-grid { grid-template-columns: 1fr; }
+  .budget-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "paycheck"
+      "results"
+      "cats";
+  }
   .summary-grid { grid-template-columns: 1fr 1fr; }
   .settings-grid { grid-template-columns: 1fr; }
   .page { padding: 14px; }
   .hist-table { font-size: .72rem; }
+  /* prevent any card from overflowing the viewport */
+  .card { overflow-x: hidden; }
+  .wf-row { overflow-x: hidden; }
 }

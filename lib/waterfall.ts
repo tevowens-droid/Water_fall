@@ -1,19 +1,62 @@
 import { Category, HistoryEntry, WaterfallResult } from './types';
 
+/**
+ * Safely parse any date string we store:
+ *   ISO  "YYYY-MM-DD"  → local midnight (unambiguous)
+ *   Legacy "M/D/YYYY"  → built manually to avoid locale-parsing bugs
+ */
+export function parseHistoryDate(dateStr: string): Date {
+  if (!dateStr) return new Date();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return new Date(dateStr + 'T00:00:00');
+  }
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    const [m, d, y] = parts.map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(dateStr);
+}
+
+/** "Feb 6, 2026" from any stored date string */
+export function displayDate(dateStr: string): string {
+  return parseHistoryDate(dateStr).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
+/** "YYYY-MM" from any stored date string */
+export function toYearMonth(dateStr: string): string {
+  const d = parseHistoryDate(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Current month as "YYYY-MM" */
+export function currentYearMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** "YYYY-MM" → "February 2026" */
+export function monthLabel(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
 export function getMTD(
   categoryName: string,
   payDate: string,
   history: HistoryEntry[]
 ): number {
-  const pd = new Date(payDate + 'T00:00:00');
+  const pd    = parseHistoryDate(payDate);
   const month = pd.getMonth();
-  const year = pd.getFullYear();
+  const year  = pd.getFullYear();
   return history
     .filter(h => {
-      const hd = new Date(h.date);
+      const hd = parseHistoryDate(h.date);
       return (
-        h.category === categoryName &&
-        hd.getMonth() === month &&
+        h.category       === categoryName &&
+        hd.getMonth()    === month        &&
         hd.getFullYear() === year
       );
     })
@@ -42,7 +85,7 @@ export function calcWaterfall(
   let rem = amount;
 
   return categories.map(cat => {
-    const fullTarget = cat.target || 0;
+    const fullTarget  = cat.target || 0;
     const alreadyPaid = mtd[cat.name] || 0;
     const stillNeeded = Math.max(0, fullTarget - alreadyPaid);
 
