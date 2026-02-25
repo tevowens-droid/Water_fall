@@ -17,6 +17,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "googleapis": "^171.4.0",
     "typescript": "^5"
   }
 }
