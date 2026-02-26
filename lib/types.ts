@@ -31,7 +31,6 @@ export interface SheetCategory {
 export interface SheetData {
   thisWeek: WeekData;
   nextWeek: WeekData;
-  categories: SheetCategory[];
 }
 
 export interface HistoryRow {

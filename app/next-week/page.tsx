@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
-import { SheetData, SheetRow } from '@/lib/types';
+import { SheetData, SheetRow, HistoryRow } from '@/lib/types';
 import { parseHistoryDate, fmt } from '@/lib/waterfall';
 
 const METHOD_ICONS: Record<string, string> = {
@@ -19,6 +19,7 @@ function fmtDate(s: string) {
 export default function NextWeekPage() {
   const { flows } = useApp();
   const [data, setData]       = useState<SheetData | null>(null);
+  const [history, setHistory] = useState<HistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [activeTab, setActiveTab] = useState<'flow' | 'alloc'>('flow');
@@ -28,15 +29,19 @@ export default function NextWeekPage() {
   const fetchData = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const res = await fetch('/api/sheets');
-      if (!res.ok) { const t = await res.text(); throw new Error(t); }
-      const json: SheetData = await res.json();
+      const [sheetRes, histRes] = await Promise.all([
+        fetch('/api/sheets'),
+        fetch('/api/sheets/history'),
+      ]);
+      if (!sheetRes.ok) { const t = await sheetRes.text(); throw new Error(t); }
+      const json: SheetData = await sheetRes.json();
       setData(json);
       const init: Record<string, string> = {};
       json.nextWeek.rows.forEach(r => {
         if (r.override !== null) init[r.category] = String(r.override);
       });
       setOverrides(init);
+      if (histRes.ok) setHistory(await histRes.json());
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }, []);
@@ -61,6 +66,20 @@ export default function NextWeekPage() {
   const week = data?.nextWeek;
   const effAmt = (r: SheetRow) => r.override ?? r.allocation;
   const fundedRows = week?.rows.filter(r => effAmt(r) > 0) ?? [];
+
+  const now = new Date();
+  const mtdByCategory: Record<string, number> = {};
+  history.forEach(h => {
+    const d = parseHistoryDate(h.date);
+    if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+      mtdByCategory[h.category] = (mtdByCategory[h.category] ?? 0) + h.amount;
+    }
+  });
+  const catProgress = (week?.rows ?? []).map(r => ({
+    name: r.category,
+    monthlyTarget: r.monthlyNeed,
+    mtd: mtdByCategory[r.category] ?? 0,
+  }));
 
   const accountMap: Record<string, { account: string; total: number; categories: string[]; method: string }> = {};
   fundedRows.forEach(r => {
@@ -221,11 +240,11 @@ export default function NextWeekPage() {
           <div className="budget-cats">
             <div className="card">
               <div className="card-title">Monthly Progress</div>
-              {data.categories.map((cat, i) => {
+              {catProgress.map((cat, i) => {
                 const pct    = cat.monthlyTarget > 0 ? Math.min(100, cat.mtd / cat.monthlyTarget * 100) : (cat.mtd > 0 ? 100 : 0);
                 const isFull = cat.monthlyTarget > 0 && cat.mtd >= cat.monthlyTarget;
                 return (
-                  <div key={cat.name} style={{ padding: '8px 4px', borderBottom: i < data.categories.length - 1 ? '1px solid rgba(46,51,80,.4)' : 'none' }}>
+                  <div key={cat.name} style={{ padding: '8px 4px', borderBottom: i < catProgress.length - 1 ? '1px solid rgba(46,51,80,.4)' : 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: cat.monthlyTarget ? 5 : 0 }}>
                       <div style={{ width: 20, height: 20, borderRadius: '50%', background: isFull ? 'var(--green)' : 'var(--border)', color: isFull ? '#000' : 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.63rem', fontWeight: 700, flexShrink: 0 }}>
                         {isFull ? '✓' : i + 1}

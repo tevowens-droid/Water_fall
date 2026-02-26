@@ -1,13 +1,13 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
-import { FlowStep, SheetCategory } from '@/lib/types';
+import { FlowStep } from '@/lib/types';
 
 const METHODS = ['Transfer', 'Zelle', 'Wire', 'ACH', 'Cash', 'Check', 'Bill Pay', 'Other'];
 
 export default function SettingsPage() {
   const { flows, setFlows } = useApp();
-  const [cats, setCats]   = useState<SheetCategory[]>([]);
+  const [cats, setCats]   = useState<{ name: string; monthlyTarget: number }[]>([]);
   const [draft, setDraft] = useState<Record<string, FlowStep[]>>({});
   const [toast, setToast] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -17,12 +17,15 @@ export default function SettingsPage() {
     try {
       const res  = await fetch('/api/sheets');
       const json = await res.json();
-      const names: SheetCategory[] = json.categories ?? [];
+      const names = (json.thisWeek?.rows ?? []).map((r: { category: string; monthlyNeed: number }) => ({
+        name: r.category,
+        monthlyTarget: r.monthlyNeed,
+      }));
       setCats(names);
       // Merge: keep existing flow steps, add empty arrays for new categories
       setDraft(prev => {
         const merged = { ...flows };
-        names.forEach(c => { if (!merged[c.name]) merged[c.name] = []; });
+        names.forEach((c: { name: string }) => { if (!merged[c.name]) merged[c.name] = []; });
         return merged;
       });
     } catch { /* use existing draft */ }
@@ -52,7 +55,7 @@ export default function SettingsPage() {
     setTimeout(() => setToast(false), 2000);
   }
 
-  const catList = cats.length > 0 ? cats : Object.keys(draft).map(name => ({ name, type: 'F' as const, monthlyTarget: 0, mtd: 0 }));
+  const catList = cats.length > 0 ? cats : Object.keys(draft).map(name => ({ name, monthlyTarget: 0 }));
 
   return (
     <div className="page">
@@ -68,7 +71,6 @@ export default function SettingsPage() {
           <div key={cat.name} style={{ marginBottom: 22, paddingBottom: 20, borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <span style={{ fontWeight: 700, fontSize: '.88rem' }}>{cat.name}</span>
-              <span className={`type-badge type-${cat.type}`}>{cat.type === 'F' ? 'Fixed' : 'Var'}</span>
               {cat.monthlyTarget > 0 && <span style={{ fontSize: '.75rem', color: 'var(--text2)' }}>${cat.monthlyTarget.toLocaleString()}/mo</span>}
             </div>
 

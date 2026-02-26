@@ -87,35 +87,17 @@ export async function GET() {
 
   try {
     const sheets = getSheets();
-    const [payRes, catRes] = await Promise.all([
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SHEET_ID,
-        range: 'Paycheck_Input!A1:K30',
-        valueRenderOption: 'FORMATTED_VALUE',
-      }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SHEET_ID,
-        range: 'Categories!A2:D20',
-        valueRenderOption: 'FORMATTED_VALUE',
-      }),
-    ]);
+    const payRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: 'Paycheck_Input!A1:K30',
+      valueRenderOption: 'FORMATTED_VALUE',
+    });
 
-    const vals    = (payRes.data.values ?? []) as unknown[][];
-    const catVals = (catRes.data.values ?? []) as unknown[][];
-
-    const categories = catVals
-      .filter(r => r[0] && String(r[0]).trim())
-      .map(r => ({
-        name:          String(r[0]),
-        type:          String(r[1] ?? 'F') as 'F' | 'V',
-        monthlyTarget: parseNum(r[2]),
-        mtd:           parseNum(r[3]),
-      }));
+    const vals = (payRes.data.values ?? []) as unknown[][];
 
     return NextResponse.json({
-      thisWeek:   parseWeek(vals, 'left'),
-      nextWeek:   parseWeek(vals, 'right'),
-      categories,
+      thisWeek: parseWeek(vals, 'left'),
+      nextWeek: parseWeek(vals, 'right'),
     });
   } catch (err) {
     console.error('Sheets read error:', err);
