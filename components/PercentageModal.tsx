@@ -1,132 +1,99 @@
 'use client';
-import { useState } from 'react';
-import { Category, HistoryEntry } from '@/lib/types';
+import { useState, useEffect } from 'react';
 import { fmt } from '@/lib/waterfall';
 
 interface Props {
-  remaining: number;
-  date: string;        // ISO "YYYY-MM-DD"
-  categories: Category[];
-  onAllocate: (entries: HistoryEntry[]) => void;
+  excess: number;
+  categoryNames: string[];
   onClose: () => void;
 }
 
-export default function PercentageModal({ remaining, date, categories, onAllocate, onClose }: Props) {
-  const [step, setStep] = useState<1 | 2>(1);
-  const inv1Cat = categories.find(c => c.name === 'Investment 1');
-  const inv1Default = inv1Cat?.target
-    ? Math.min(inv1Cat.target / 4, remaining)
-    : Math.min(250, remaining);
+interface PctRow {
+  category: string;
+  pct: string;
+}
 
-  const [inv1Amt, setInv1Amt] = useState(inv1Default);
-  const [percents, setPercents] = useState<number[]>(categories.map(() => 0));
+export default function PercentageModal({ excess, categoryNames, onClose }: Props) {
+  const [rows, setRows] = useState<PctRow[]>([]);
 
-  const afterInv1 = Math.max(0, remaining - inv1Amt);
-  const totalPct  = percents.reduce((a, b) => a + b, 0);
-  const totalAmt  = afterInv1 * Math.min(totalPct, 100) / 100;
-  const pctColor  = Math.abs(totalPct - 100) < 0.1 ? 'var(--green)' : totalPct > 100 ? 'var(--red)' : 'var(--text)';
+  useEffect(() => {
+    setRows(categoryNames.map(name => ({ category: name, pct: '' })));
+  }, [categoryNames]);
 
-  function handleAllocate() {
-    const entries: HistoryEntry[] = [];
-    if (inv1Amt > 0) {
-      entries.push({ date, category: 'Investment 1', allocated: parseFloat(inv1Amt.toFixed(2)), target: null, isOverflow: true });
-    }
-    categories.forEach((cat, i) => {
-      const pct = percents[i];
-      if (pct <= 0) return;
-      const amt = parseFloat((afterInv1 * pct / 100).toFixed(2));
-      if (amt > 0) entries.push({ date, category: cat.name, allocated: amt, target: null, isOverflow: true });
-    });
-    onAllocate(entries);
+  function updatePct(i: number, val: string) {
+    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, pct: val } : r));
   }
 
-  function setPct(i: number, val: number) {
-    const next = [...percents];
-    next[i] = Math.max(0, val);
-    setPercents(next);
-  }
+  const totalPct = rows.reduce((s, r) => s + (parseFloat(r.pct) || 0), 0);
+  const remaining = 100 - totalPct;
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box">
-        <div className="modal-title">🎉 All Buckets Full!</div>
-        <div className="modal-sub">
-          You have <strong style={{ color: 'var(--green)' }}>${fmt(remaining)}</strong> left over after all
-          buckets are fully funded.<br />Ready to allocate by percentage?
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div className="card-title" style={{ marginBottom: 0 }}>Distribute Excess</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: '1.1rem' }}>✕</button>
         </div>
 
-        {step === 1 && (
-          <div className="modal-actions">
-            <button className="btn-yes" onClick={() => setStep(2)}>Yes, allocate!</button>
-            <button className="btn-no" onClick={onClose}>No thanks</button>
-          </div>
-        )}
+        <div style={{ background: 'rgba(0,212,170,.1)', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--text2)', marginBottom: 2 }}>Available to distribute</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent2)' }}>${fmt(excess)}</div>
+        </div>
 
-        {step === 2 && (
-          <>
-            <div className="inv1-fixed-box">
-              <div style={{ fontSize: '.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.1px', color: 'var(--fixed)', marginBottom: 10 }}>
-                Investment 1 — Fixed Priority
-              </div>
-              <div className="pct-row" style={{ border: 'none', padding: 0 }}>
-                <span className="pct-label" style={{ color: 'var(--text2)' }}>Auto-allocate to Investment 1</span>
-                <input
-                  className="pct-input"
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={inv1Amt}
-                  onChange={e => setInv1Amt(Math.max(0, parseFloat(e.target.value) || 0))}
-                  style={{ width: 90 }}
-                />
-                <span className="pct-dollar" style={{ color: 'var(--fixed)' }}>${fmt(inv1Amt)}</span>
-              </div>
-            </div>
+        <div style={{ fontSize: '.75rem', color: 'var(--text2)', marginBottom: 12 }}>
+          Enter what % of the excess goes to each category. Leave blank to skip.
+        </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text2)' }}>
-                Remaining to distribute by %
-              </div>
-              <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--accent2)' }}>${fmt(afterInv1)}</div>
-            </div>
-
-            <div>
-              {categories.map((cat, i) => (
-                <div key={cat.name} className="pct-row">
-                  <span className="pct-label">
-                    {cat.name}{' '}
-                    <span className={`type-badge type-${cat.type}`}>{cat.type === 'F' ? 'Fixed' : 'Var'}</span>
-                  </span>
+        <div style={{ maxHeight: '45vh', overflowY: 'auto', marginBottom: 14 }}>
+          {rows.map((r, i) => {
+            const amt = (parseFloat(r.pct) || 0) / 100 * excess;
+            return (
+              <div key={r.category} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid rgba(46,51,80,.3)' }}>
+                <div style={{ flex: 1, fontSize: '.85rem', fontWeight: 600 }}>{r.category}</div>
+                <div style={{ position: 'relative', width: 70 }}>
                   <input
-                    className="pct-input"
                     type="number"
                     min={0}
                     max={100}
-                    step={1}
-                    value={percents[i] || ''}
-                    placeholder="0%"
-                    onChange={e => setPct(i, parseFloat(e.target.value) || 0)}
+                    step={0.1}
+                    placeholder="0"
+                    value={r.pct}
+                    onChange={e => updatePct(i, e.target.value)}
+                    style={{ width: '100%', paddingRight: 18 }}
                   />
-                  <span className="pct-dollar">${fmt(afterInv1 * (percents[i] || 0) / 100)}</span>
+                  <span style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', fontSize: '.75rem', color: 'var(--text2)', pointerEvents: 'none' }}>%</span>
                 </div>
-              ))}
-            </div>
+                <div style={{ width: 70, textAlign: 'right', fontSize: '.85rem', fontWeight: 700, color: amt > 0 ? 'var(--accent2)' : 'var(--text2)' }}>
+                  {amt > 0 ? `$${fmt(amt)}` : '—'}
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-            <div className="pct-total-bar">
-              <span style={{ color: 'var(--text2)' }}>
-                Total: <span style={{ fontWeight: 700, color: pctColor }}>{totalPct.toFixed(1)}%</span>
-              </span>
-              <span style={{ color: 'var(--text2)' }}>
-                Amount: <span style={{ fontWeight: 700, color: 'var(--accent)' }}>${fmt(totalAmt)}</span>
-              </span>
-            </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid var(--border)', marginBottom: 14 }}>
+          <span style={{ fontSize: '.82rem', color: 'var(--text2)' }}>Total assigned</span>
+          <span style={{ fontWeight: 800, color: Math.abs(remaining) < 0.01 ? 'var(--green)' : remaining < 0 ? 'var(--red)' : 'var(--yellow)' }}>
+            {totalPct.toFixed(1)}% · ${fmt(totalPct / 100 * excess)}
+          </span>
+        </div>
 
-            <div className="modal-actions" style={{ marginTop: 14 }}>
-              <button className="btn-yes" onClick={handleAllocate}>Allocate &amp; Save</button>
-              <button className="btn-no" onClick={onClose}>Cancel</button>
-            </div>
-          </>
+        {remaining > 0.01 && (
+          <div style={{ fontSize: '.75rem', color: 'var(--yellow)', marginBottom: 10 }}>
+            ⚠ {remaining.toFixed(1)}% unassigned (${fmt(remaining / 100 * excess)})
+          </div>
         )}
+        {remaining < -0.01 && (
+          <div style={{ fontSize: '.75rem', color: 'var(--red)', marginBottom: 10 }}>
+            ✕ Over by {Math.abs(remaining).toFixed(1)}% — reduce some percentages
+          </div>
+        )}
+
+        <div style={{ fontSize: '.72rem', color: 'var(--text2)', marginBottom: 14, lineHeight: 1.5 }}>
+          These are your transfer instructions. Execute them manually or update your sheet.
+        </div>
+
+        <button className="run-btn" onClick={onClose} style={{ width: '100%' }}>Done</button>
       </div>
     </div>
   );

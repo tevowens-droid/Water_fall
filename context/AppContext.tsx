@@ -1,62 +1,39 @@
 'use client';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Category, HistoryEntry } from '@/lib/types';
-import { initialCategories, initialHistory } from '@/lib/initialData';
+import { FlowStep } from '@/lib/types';
 
-interface AppContextType {
-  categories: Category[];
-  setCategories: (cats: Category[]) => void;
-  history: HistoryEntry[];
-  setHistory: (h: HistoryEntry[]) => void;
-  sheetsUrl: string;
-  setSheetsUrl: (url: string) => void;
+// AppContext now only manages flow instructions (which account/method each
+// category uses). Everything else — allocations, history, categories —
+// is read live from Google Sheets via the /api/sheets routes.
+
+interface AppContextValue {
+  flows: Record<string, FlowStep[]>;
+  setFlows: (flows: Record<string, FlowStep[]>) => void;
 }
 
-const AppContext = createContext<AppContextType | null>(null);
-
-function loadFromStorage<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
+const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [categories, setCategoriesState] = useState<Category[]>(initialCategories);
-  const [history, setHistoryState] = useState<HistoryEntry[]>(initialHistory);
-  const [sheetsUrl, setSheetsUrlState] = useState('');
-  const [hydrated, setHydrated] = useState(false);
+  const [flows, setFlowsState] = useState<Record<string, FlowStep[]>>({});
+  const [ready, setReady] = useState(false);
 
-  // Load persisted state from localStorage on mount
   useEffect(() => {
-    setCategoriesState(loadFromStorage('wf_categories', initialCategories));
-    setHistoryState(loadFromStorage('wf_history', initialHistory));
-    setSheetsUrlState(localStorage.getItem('sheetsUrl') || '');
-    setHydrated(true);
+    try {
+      const stored = localStorage.getItem('wf_flows');
+      if (stored) setFlowsState(JSON.parse(stored));
+    } catch { /* ignore parse errors */ }
+    setReady(true);
   }, []);
 
-  const setCategories = (cats: Category[]) => {
-    setCategoriesState(cats);
-    localStorage.setItem('wf_categories', JSON.stringify(cats));
-  };
+  function setFlows(f: Record<string, FlowStep[]>) {
+    setFlowsState(f);
+    try { localStorage.setItem('wf_flows', JSON.stringify(f)); } catch { /* ignore */ }
+  }
 
-  const setHistory = (h: HistoryEntry[]) => {
-    setHistoryState(h);
-    localStorage.setItem('wf_history', JSON.stringify(h));
-  };
-
-  const setSheetsUrl = (url: string) => {
-    setSheetsUrlState(url);
-    localStorage.setItem('sheetsUrl', url);
-  };
-
-  if (!hydrated) return null;
+  if (!ready) return null;
 
   return (
-    <AppContext.Provider value={{ categories, setCategories, history, setHistory, sheetsUrl, setSheetsUrl }}>
+    <AppContext.Provider value={{ flows, setFlows }}>
       {children}
     </AppContext.Provider>
   );
