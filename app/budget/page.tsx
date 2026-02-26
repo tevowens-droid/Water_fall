@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
-import { SheetData, SheetRow, HistoryRow } from '@/lib/types';
+import { SheetData, SheetRow } from '@/lib/types';
 import { parseHistoryDate, fmt } from '@/lib/waterfall';
 import PercentageModal from '@/components/PercentageModal';
 
@@ -20,7 +20,6 @@ function fmtDate(s: string) {
 export default function BudgetPage() {
   const { flows } = useApp();
   const [data, setData]       = useState<SheetData | null>(null);
-  const [history, setHistory] = useState<HistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [activeTab, setActiveTab] = useState<'flow' | 'alloc'>('flow');
@@ -32,12 +31,9 @@ export default function BudgetPage() {
   const fetchData = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [sheetRes, histRes] = await Promise.all([
-        fetch('/api/sheets'),
-        fetch('/api/sheets/history'),
-      ]);
-      if (!sheetRes.ok) { const t = await sheetRes.text(); throw new Error(t); }
-      const json: SheetData = await sheetRes.json();
+      const res = await fetch('/api/sheets');
+      if (!res.ok) { const t = await res.text(); throw new Error(t); }
+      const json: SheetData = await res.json();
       setData(json);
       // Seed override inputs from Sheets values
       const init: Record<string, string> = {};
@@ -45,7 +41,6 @@ export default function BudgetPage() {
         if (r.override !== null) init[r.category] = String(r.override);
       });
       setOverrides(init);
-      if (histRes.ok) setHistory(await histRes.json());
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }, []);
@@ -84,31 +79,28 @@ export default function BudgetPage() {
     });
   });
 
-  const excess      = week?.left ?? 0;
-  const catNames    = data?.thisWeek.rows.map(r => r.category) ?? [];
+  const excess = week?.left ?? 0;
 
-  // Compute month-to-date from history for the current calendar month
-  const now = new Date();
-  const mtdByCategory: Record<string, number> = {};
-  history.forEach(h => {
-    const d = parseHistoryDate(h.date);
-    if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
-      mtdByCategory[h.category] = (mtdByCategory[h.category] ?? 0) + h.amount;
-    }
-  });
-  const catProgress = (week?.rows ?? []).map(r => ({
-    name: r.category,
-    monthlyTarget: r.monthlyNeed,
-    mtd: mtdByCategory[r.category] ?? 0,
-  }));
+  async function applyExcess(dist: { rowNumber: number; newValue: number }[]) {
+    await Promise.all(dist.map(d =>
+      fetch('/api/sheets/override', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rowNumber: d.rowNumber, value: d.newValue, week: 'thisWeek' }),
+      })
+    ));
+    setPctModal(false);
+    await fetchData();
+  }
 
   return (
     <div className="page">
       {pctModal && week && (
         <PercentageModal
           excess={excess}
-          categoryNames={catNames}
+          rows={week.rows}
           onClose={() => setPctModal(false)}
+          onApply={applyExcess}
         />
       )}
 
@@ -310,36 +302,32 @@ export default function BudgetPage() {
                   <div className="v" style={{ color: excess > 0 ? 'var(--yellow)' : 'var(--green)' }}>${fmt(excess)}</div>
                   <div className="l">Remaining</div>
                 </div>
-                <div className="stat">
-                  <div className="v" style={{ color: 'var(--text2)' }}>{week.rows.length}</div>
-                  <div className="l">Categories</div>
-                </div>
               </div>
             </div>
           </div>
 
-          {/* ══ BOTTOM LEFT: CATEGORIES ══ */}
+          {/* ══ BOTTOM LEFT: MONTHLY PROGRESS ══ */}
           <div className="budget-cats">
             <div className="card">
               <div className="card-title">Monthly Progress</div>
-              {catProgress.map((cat, i) => {
-                const pct    = cat.monthlyTarget > 0 ? Math.min(100, cat.mtd / cat.monthlyTarget * 100) : (cat.mtd > 0 ? 100 : 0);
-                const isFull = cat.monthlyTarget > 0 && cat.mtd >= cat.monthlyTarget;
+              {week.rows.map((r, i) => {
+                const isFull = r.remaining === 0;
+                const pct    = r.monthlyNeed > 0 ? Math.min(100, (r.monthlyNeed - r.remaining) / r.monthlyNeed * 100) : (isFull ? 100 : 0);
                 return (
-                  <div key={cat.name} style={{ padding: '8px 4px', borderBottom: i < catProgress.length - 1 ? '1px solid rgba(46,51,80,.4)' : 'none' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: cat.monthlyTarget ? 5 : 0 }}>
+                  <div key={r.category} style={{ padding: '8px 4px', borderBottom: i < week.rows.length - 1 ? '1px solid rgba(46,51,80,.4)' : 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: r.monthlyNeed > 0 ? 5 : 0 }}>
                       <div style={{ width: 20, height: 20, borderRadius: '50%', background: isFull ? 'var(--green)' : 'var(--border)', color: isFull ? '#000' : 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.63rem', fontWeight: 700, flexShrink: 0 }}>
                         {isFull ? '✓' : i + 1}
                       </div>
-                      <span style={{ flex: 1, fontSize: '.82rem', fontWeight: 600 }}>{cat.name}</span>
+                      <span style={{ flex: 1, fontSize: '.82rem', fontWeight: 600 }}>{r.category}</span>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '.8rem', fontWeight: 700, color: isFull ? 'var(--green)' : cat.mtd > 0 ? 'var(--accent)' : 'var(--text2)' }}>
-                          {cat.mtd > 0 ? '$' + fmt(cat.mtd) : '—'}
+                        <div style={{ fontSize: '.8rem', fontWeight: 700, color: isFull ? 'var(--green)' : r.remaining > 0 ? 'var(--accent)' : 'var(--text2)' }}>
+                          {isFull ? 'Funded' : r.remaining > 0 ? `$${fmt(r.remaining)} left` : '—'}
                         </div>
-                        {cat.monthlyTarget > 0 && <div style={{ fontSize: '.63rem', color: 'var(--text2)' }}>of ${cat.monthlyTarget.toLocaleString()}</div>}
+                        {r.monthlyNeed > 0 && <div style={{ fontSize: '.63rem', color: 'var(--text2)' }}>of ${r.monthlyNeed.toLocaleString()}</div>}
                       </div>
                     </div>
-                    {cat.monthlyTarget > 0 && (
+                    {r.monthlyNeed > 0 && (
                       <div style={{ height: 3, background: 'var(--border)', borderRadius: 2, marginLeft: 28, overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${pct}%`, background: isFull ? 'var(--green)' : pct > 0 ? 'var(--accent)' : 'var(--border)', borderRadius: 2, transition: 'width .6s ease' }} />
                       </div>

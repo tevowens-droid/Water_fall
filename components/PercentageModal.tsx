@@ -1,31 +1,48 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { SheetRow } from '@/lib/types';
 import { fmt } from '@/lib/waterfall';
 
 interface Props {
   excess: number;
-  categoryNames: string[];
+  rows: SheetRow[];
   onClose: () => void;
+  onApply: (dist: { rowNumber: number; newValue: number }[]) => Promise<void>;
 }
 
-interface PctRow {
-  category: string;
-  pct: string;
-}
-
-export default function PercentageModal({ excess, categoryNames, onClose }: Props) {
-  const [rows, setRows] = useState<PctRow[]>([]);
+export default function PercentageModal({ excess, rows, onClose, onApply }: Props) {
+  const [pcts, setPcts]       = useState<Record<string, string>>({});
+  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
-    setRows(categoryNames.map(name => ({ category: name, pct: '' })));
-  }, [categoryNames]);
+    const init: Record<string, string> = {};
+    rows.forEach(r => { init[r.category] = ''; });
+    setPcts(init);
+  }, [rows]);
 
-  function updatePct(i: number, val: string) {
-    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, pct: val } : r));
+  function updatePct(cat: string, val: string) {
+    setPcts(prev => ({ ...prev, [cat]: val }));
   }
 
-  const totalPct = rows.reduce((s, r) => s + (parseFloat(r.pct) || 0), 0);
-  const remaining = 100 - totalPct;
+  const totalPct   = rows.reduce((s, r) => s + (parseFloat(pcts[r.category] || '0') || 0), 0);
+  const unassigned = 100 - totalPct;
+
+  async function handleApply() {
+    const dist = rows
+      .map(r => {
+        const pctVal = parseFloat(pcts[r.category] || '0') || 0;
+        if (pctVal <= 0) return null;
+        const addAmt     = pctVal / 100 * excess;
+        const currentAmt = r.override ?? r.allocation;
+        return { rowNumber: r.rowNumber, newValue: currentAmt + addAmt };
+      })
+      .filter((d): d is { rowNumber: number; newValue: number } => d !== null);
+
+    if (dist.length === 0) { onClose(); return; }
+    setApplying(true);
+    try { await onApply(dist); }
+    finally { setApplying(false); }
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -41,12 +58,12 @@ export default function PercentageModal({ excess, categoryNames, onClose }: Prop
         </div>
 
         <div style={{ fontSize: '.75rem', color: 'var(--text2)', marginBottom: 12 }}>
-          Enter what % of the excess goes to each category. Leave blank to skip.
+          Enter what % of the excess goes to each category. Amounts are added to existing allocations.
         </div>
 
         <div style={{ maxHeight: '45vh', overflowY: 'auto', marginBottom: 14 }}>
-          {rows.map((r, i) => {
-            const amt = (parseFloat(r.pct) || 0) / 100 * excess;
+          {rows.map(r => {
+            const amt = (parseFloat(pcts[r.category] || '0') || 0) / 100 * excess;
             return (
               <div key={r.category} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid rgba(46,51,80,.3)' }}>
                 <div style={{ flex: 1, fontSize: '.85rem', fontWeight: 600 }}>{r.category}</div>
@@ -57,14 +74,14 @@ export default function PercentageModal({ excess, categoryNames, onClose }: Prop
                     max={100}
                     step={0.1}
                     placeholder="0"
-                    value={r.pct}
-                    onChange={e => updatePct(i, e.target.value)}
+                    value={pcts[r.category] ?? ''}
+                    onChange={e => updatePct(r.category, e.target.value)}
                     style={{ width: '100%', paddingRight: 18 }}
                   />
                   <span style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', fontSize: '.75rem', color: 'var(--text2)', pointerEvents: 'none' }}>%</span>
                 </div>
                 <div style={{ width: 70, textAlign: 'right', fontSize: '.85rem', fontWeight: 700, color: amt > 0 ? 'var(--accent2)' : 'var(--text2)' }}>
-                  {amt > 0 ? `$${fmt(amt)}` : '—'}
+                  {amt > 0 ? `+$${fmt(amt)}` : '—'}
                 </div>
               </div>
             );
@@ -73,27 +90,30 @@ export default function PercentageModal({ excess, categoryNames, onClose }: Prop
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid var(--border)', marginBottom: 14 }}>
           <span style={{ fontSize: '.82rem', color: 'var(--text2)' }}>Total assigned</span>
-          <span style={{ fontWeight: 800, color: Math.abs(remaining) < 0.01 ? 'var(--green)' : remaining < 0 ? 'var(--red)' : 'var(--yellow)' }}>
+          <span style={{ fontWeight: 800, color: Math.abs(unassigned) < 0.01 ? 'var(--green)' : unassigned < 0 ? 'var(--red)' : 'var(--yellow)' }}>
             {totalPct.toFixed(1)}% · ${fmt(totalPct / 100 * excess)}
           </span>
         </div>
 
-        {remaining > 0.01 && (
+        {unassigned > 0.01 && (
           <div style={{ fontSize: '.75rem', color: 'var(--yellow)', marginBottom: 10 }}>
-            ⚠ {remaining.toFixed(1)}% unassigned (${fmt(remaining / 100 * excess)})
+            ⚠ {unassigned.toFixed(1)}% unassigned (${fmt(unassigned / 100 * excess)})
           </div>
         )}
-        {remaining < -0.01 && (
+        {unassigned < -0.01 && (
           <div style={{ fontSize: '.75rem', color: 'var(--red)', marginBottom: 10 }}>
-            ✕ Over by {Math.abs(remaining).toFixed(1)}% — reduce some percentages
+            ✕ Over by {Math.abs(unassigned).toFixed(1)}% — reduce some percentages
           </div>
         )}
 
-        <div style={{ fontSize: '.72rem', color: 'var(--text2)', marginBottom: 14, lineHeight: 1.5 }}>
-          These are your transfer instructions. Execute them manually or update your sheet.
-        </div>
-
-        <button className="run-btn" onClick={onClose} style={{ width: '100%' }}>Done</button>
+        <button
+          className="run-btn"
+          onClick={handleApply}
+          disabled={applying || totalPct <= 0 || unassigned < -0.01}
+          style={{ width: '100%', background: applying ? 'var(--border)' : 'var(--accent2)' }}
+        >
+          {applying ? '⏳ Saving…' : '✓ Apply to Allocations'}
+        </button>
       </div>
     </div>
   );
