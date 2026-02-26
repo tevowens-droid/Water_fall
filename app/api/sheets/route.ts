@@ -2,11 +2,26 @@ import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 
 function getSheets() {
+  // Support either a full JSON key (GOOGLE_SERVICE_ACCOUNT_JSON) or
+  // individual vars (GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY)
+  let credentials: { client_email: string; private_key: string };
+
+  const jsonKey = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (jsonKey) {
+    const parsed = JSON.parse(jsonKey);
+    credentials = {
+      client_email: parsed.client_email,
+      private_key:  parsed.private_key,
+    };
+  } else {
+    credentials = {
+      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? '',
+      private_key:  (process.env.GOOGLE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n'),
+    };
+  }
+
   const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: (process.env.GOOGLE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n'),
-    },
+    credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
   return google.sheets({ version: 'v4', auth });
@@ -20,12 +35,12 @@ function parseNum(v: unknown): number {
 
 function parseWeek(vals: unknown[][], section: 'left' | 'right') {
   const L = section === 'left';
-  const mvc  = L ? 2 : 8;   // meta value col: C (this week) or I (next week)
-  const catC = L ? 0 : 6;   // A or G
-  const alcC = L ? 1 : 7;   // B or H
-  const remC = L ? 2 : 8;   // C or I
-  const ovrC = L ? 3 : 9;   // D or J
-  const mnC  = L ? 4 : 10;  // E or K
+  const mvc  = L ? 2 : 8;
+  const catC = L ? 0 : 6;
+  const alcC = L ? 1 : 7;
+  const remC = L ? 2 : 8;
+  const ovrC = L ? 3 : 9;
+  const mnC  = L ? 4 : 10;
 
   const row = (i: number): unknown[] => vals[i] ?? [];
 
@@ -44,8 +59,7 @@ function parseWeek(vals: unknown[][], section: 'left' | 'right') {
       allocation:  parseNum(r[alcC]),
       remaining:   parseNum(r[remC]),
       override:    (ovrRaw !== undefined && ovrRaw !== '' && ovrRaw !== null)
-                     ? parseNum(ovrRaw)
-                     : null,
+                     ? parseNum(ovrRaw) : null,
       monthlyNeed: parseNum(r[mnC]),
       rowNumber:   i + 1,
     });
@@ -54,19 +68,19 @@ function parseWeek(vals: unknown[][], section: 'left' | 'right') {
 }
 
 export async function GET() {
-  // Read env vars inside the handler so they're always fresh in serverless
-  const SHEET_ID   = process.env.GOOGLE_SHEET_ID;
-  const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const PRIVATE_KEY  = process.env.GOOGLE_PRIVATE_KEY;
-
-  if (!SHEET_ID || !CLIENT_EMAIL || !PRIVATE_KEY) {
-    const missing = [
-      !SHEET_ID      && 'GOOGLE_SHEET_ID',
-      !CLIENT_EMAIL  && 'GOOGLE_SERVICE_ACCOUNT_EMAIL',
-      !PRIVATE_KEY   && 'GOOGLE_PRIVATE_KEY',
-    ].filter(Boolean).join(', ');
+  const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+  if (!SHEET_ID) {
     return NextResponse.json(
-      { error: `Missing environment variable(s): ${missing}. Add them in Vercel → Settings → Environment Variables (or .env.local for local dev).` },
+      { error: 'Missing GOOGLE_SHEET_ID environment variable. Add it in Vercel → Settings → Environment Variables.' },
+      { status: 500 }
+    );
+  }
+
+  const hasJson = !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  const hasIndividual = !!(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY);
+  if (!hasJson && !hasIndividual) {
+    return NextResponse.json(
+      { error: 'Missing credentials. Set either GOOGLE_SERVICE_ACCOUNT_JSON (the full JSON key file contents) or both GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY.' },
       { status: 500 }
     );
   }
