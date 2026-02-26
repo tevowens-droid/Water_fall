@@ -1,8 +1,6 @@
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 
-const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
-
 function getSheets() {
   const auth = new google.auth.GoogleAuth({
     credentials: {
@@ -15,6 +13,11 @@ function getSheets() {
 }
 
 export async function GET() {
+  const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+  if (!SHEET_ID) {
+    return NextResponse.json({ error: 'Missing GOOGLE_SHEET_ID environment variable' }, { status: 500 });
+  }
+
   try {
     const sheets = getSheets();
     const res = await sheets.spreadsheets.values.get({
@@ -23,7 +26,7 @@ export async function GET() {
       valueRenderOption: 'FORMATTED_VALUE',
     });
 
-    const rows = (res.data.values ?? []).slice(1); // skip header row
+    const rows = (res.data.values ?? []).slice(1);
     const history = rows
       .filter(r => r[0] && r[1])
       .map(r => ({

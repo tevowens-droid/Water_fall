@@ -2,8 +2,6 @@ import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 
-const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
-
 function getSheets() {
   const auth = new google.auth.GoogleAuth({
     credentials: {
@@ -16,9 +14,13 @@ function getSheets() {
 }
 
 export async function POST(req: NextRequest) {
+  const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+  if (!SHEET_ID) {
+    return NextResponse.json({ error: 'Missing GOOGLE_SHEET_ID environment variable' }, { status: 500 });
+  }
+
   try {
     const { rowNumber, value, week } = await req.json();
-    // week: 'thisWeek' uses column D, 'nextWeek' uses column J
     const col   = week === 'nextWeek' ? 'J' : 'D';
     const range = `Paycheck_Input!${col}${rowNumber}`;
     const cellValue = (value === null || value === '') ? '' : Number(value);

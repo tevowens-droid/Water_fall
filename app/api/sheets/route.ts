@@ -1,8 +1,6 @@
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 
-const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
-
 function getSheets() {
   const auth = new google.auth.GoogleAuth({
     credentials: {
@@ -22,14 +20,12 @@ function parseNum(v: unknown): number {
 
 function parseWeek(vals: unknown[][], section: 'left' | 'right') {
   const L = section === 'left';
-  // Meta row value column: C (index 2) for this week, I (index 8) for next week
-  const mvc = L ? 2 : 8;
-  // Category columns
+  const mvc  = L ? 2 : 8;   // meta value col: C (this week) or I (next week)
   const catC = L ? 0 : 6;   // A or G
-  const alcC = L ? 1 : 7;   // B or H  (Allocation)
-  const remC = L ? 2 : 8;   // C or I  (Remaining)
-  const ovrC = L ? 3 : 9;   // D or J  (Override)
-  const mnC  = L ? 4 : 10;  // E or K  (Monthly Need)
+  const alcC = L ? 1 : 7;   // B or H
+  const remC = L ? 2 : 8;   // C or I
+  const ovrC = L ? 3 : 9;   // D or J
+  const mnC  = L ? 4 : 10;  // E or K
 
   const row = (i: number): unknown[] => vals[i] ?? [];
 
@@ -44,20 +40,37 @@ function parseWeek(vals: unknown[][], section: 'left' | 'right') {
     if (!cat || cat.toLowerCase() === 'category') continue;
     const ovrRaw = r[ovrC];
     rows.push({
-      category:   cat,
-      allocation: parseNum(r[alcC]),
-      remaining:  parseNum(r[remC]),
-      override:   (ovrRaw !== undefined && ovrRaw !== '' && ovrRaw !== null)
-                    ? parseNum(ovrRaw)
-                    : null,
+      category:    cat,
+      allocation:  parseNum(r[alcC]),
+      remaining:   parseNum(r[remC]),
+      override:    (ovrRaw !== undefined && ovrRaw !== '' && ovrRaw !== null)
+                     ? parseNum(ovrRaw)
+                     : null,
       monthlyNeed: parseNum(r[mnC]),
-      rowNumber:   i + 1,  // 1-indexed row number in the sheet
+      rowNumber:   i + 1,
     });
   }
   return { payDate, amount, left, rows };
 }
 
 export async function GET() {
+  // Read env vars inside the handler so they're always fresh in serverless
+  const SHEET_ID   = process.env.GOOGLE_SHEET_ID;
+  const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const PRIVATE_KEY  = process.env.GOOGLE_PRIVATE_KEY;
+
+  if (!SHEET_ID || !CLIENT_EMAIL || !PRIVATE_KEY) {
+    const missing = [
+      !SHEET_ID      && 'GOOGLE_SHEET_ID',
+      !CLIENT_EMAIL  && 'GOOGLE_SERVICE_ACCOUNT_EMAIL',
+      !PRIVATE_KEY   && 'GOOGLE_PRIVATE_KEY',
+    ].filter(Boolean).join(', ');
+    return NextResponse.json(
+      { error: `Missing environment variable(s): ${missing}. Add them in Vercel → Settings → Environment Variables (or .env.local for local dev).` },
+      { status: 500 }
+    );
+  }
+
   try {
     const sheets = getSheets();
     const [payRes, catRes] = await Promise.all([
@@ -86,8 +99,8 @@ export async function GET() {
       }));
 
     return NextResponse.json({
-      thisWeek: parseWeek(vals, 'left'),
-      nextWeek: parseWeek(vals, 'right'),
+      thisWeek:   parseWeek(vals, 'left'),
+      nextWeek:   parseWeek(vals, 'right'),
       categories,
     });
   } catch (err) {
