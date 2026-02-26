@@ -76,8 +76,9 @@ export default function NextWeekPage() {
   return (
     <div className="page">
       {loading && (
-        <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text2)' }}>
-          ⏳ Loading from Google Sheets…
+        <div className="loading-wrap">
+          <div className="spinner" />
+          Loading
         </div>
       )}
       {error && (

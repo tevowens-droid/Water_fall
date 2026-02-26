@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { AppProvider } from '@/context/AppContext';
 import Nav from '@/components/Nav';
 import './globals.css';
@@ -6,6 +6,14 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Waterfall Budget',
   description: 'Paycheck-to-budget waterfall allocation tool',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

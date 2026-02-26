@@ -64,7 +64,7 @@ export default function SettingsPage() {
         <p style={{ fontSize: '.8rem', color: 'var(--text2)', marginBottom: 18 }}>
           For each category, define where the money goes and how it gets there.
           Categories are pulled live from your Google Sheet.
-          {loading && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>⏳ Loading categories…</span>}
+          {loading && <span style={{ color: 'var(--text2)', marginLeft: 6, fontSize: '.72rem' }}>Loading…</span>}
         </p>
 
         {catList.map(cat => (
