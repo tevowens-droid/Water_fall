@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { AppProvider } from '@/context/AppContext';
 import Nav from '@/components/Nav';
+import PasswordGate from '@/components/PasswordGate';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -21,8 +22,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <AppProvider>
-          <Nav />
-          {children}
+          <PasswordGate>
+            <Nav />
+            {children}
+          </PasswordGate>
         </AppProvider>
       </body>
     </html>
